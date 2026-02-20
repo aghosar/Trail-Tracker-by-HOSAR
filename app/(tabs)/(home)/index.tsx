@@ -10,6 +10,8 @@ import {
   Modal,
   Platform,
   ActivityIndicator,
+  Image,
+  ImageSourcePropType,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -18,6 +20,13 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import { authenticatedGet, authenticatedPost, authenticatedPut } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Helper to resolve image sources (handles both local require() and remote URLs)
+function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
+  if (!source) return { uri: '' };
+  if (typeof source === 'string') return { uri: source };
+  return source as ImageSourcePropType;
+}
 
 interface EmergencyContact {
   id: string;
@@ -423,6 +432,11 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
+          <Image 
+            source={resolveImageSource(require('@/assets/images/72090bad-4a5e-49d2-8aae-98dae4b6514d.png'))} 
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.headerTitle}>Safety Tracker</Text>
           <Text style={styles.headerSubtitle}>Stay safe on your outdoor adventures</Text>
         </View>
@@ -756,6 +770,12 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 24,
+    alignItems: 'center',
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: 12,
   },
   headerTitle: {
     fontSize: 32,

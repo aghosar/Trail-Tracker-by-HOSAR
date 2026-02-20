@@ -7,10 +7,19 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
+  Image,
+  ImageSourcePropType,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
+
+// Helper to resolve image sources (handles both local require() and remote URLs)
+function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
+  if (!source) return { uri: '' };
+  if (typeof source === 'string') return { uri: source };
+  return source as ImageSourcePropType;
+}
 
 interface FirstAidTopic {
   id: string;
@@ -187,6 +196,11 @@ export default function FirstAidScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
+          <Image 
+            source={resolveImageSource(require('@/assets/images/72090bad-4a5e-49d2-8aae-98dae4b6514d.png'))} 
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.headerTitle}>First Aid Guide</Text>
           <Text style={styles.headerSubtitle}>Essential emergency procedures</Text>
         </View>
@@ -289,6 +303,12 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 24,
+    alignItems: 'center',
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 12,
   },
   headerTitle: {
     fontSize: 32,

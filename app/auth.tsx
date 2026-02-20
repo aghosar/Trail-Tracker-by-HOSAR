@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   View,
@@ -10,10 +11,19 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Modal,
+  Image,
+  ImageSourcePropType,
 } from "react-native";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "expo-router";
 import { colors } from "@/styles/commonStyles";
+
+// Helper to resolve image sources (handles both local require() and remote URLs)
+function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
+  if (!source) return { uri: '' };
+  if (typeof source === 'string') return { uri: source };
+  return source as ImageSourcePropType;
+}
 
 type Mode = "signin" | "signup";
 
@@ -88,7 +98,11 @@ export default function AuthScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
           <View style={styles.logoContainer}>
-            <Text style={styles.logoEmoji}>🏔️</Text>
+            <Image 
+              source={resolveImageSource(require('@/assets/images/72090bad-4a5e-49d2-8aae-98dae4b6514d.png'))} 
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <Text style={styles.appName}>Safety Tracker</Text>
             <Text style={styles.appTagline}>Stay safe on your outdoor adventures</Text>
           </View>
@@ -229,9 +243,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 32,
   },
-  logoEmoji: {
-    fontSize: 64,
-    marginBottom: 8,
+  logo: {
+    width: 140,
+    height: 140,
+    marginBottom: 12,
   },
   appName: {
     fontSize: 28,

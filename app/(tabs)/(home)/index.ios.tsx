@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import * as SMS from 'expo-sms';
 import {
   View,
   Text,
@@ -9,15 +9,24 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
+  Image,
+  ImageSourcePropType,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
-import * as Location from 'expo-location';
-import * as SMS from 'expo-sms';
-import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
-import { authenticatedGet, authenticatedPost, authenticatedPut } from '@/utils/api';
+import { Stack } from 'expo-router';
+import React, { useState, useEffect, useRef } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
+import { authenticatedGet, authenticatedPost, authenticatedPut } from '@/utils/api';
+import * as Location from 'expo-location';
+
+// Helper to resolve image sources (handles both local require() and remote URLs)
+function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
+  if (!source) return { uri: '' };
+  if (typeof source === 'string') return { uri: source };
+  return source as ImageSourcePropType;
+}
 
 interface EmergencyContact {
   id: string;
@@ -40,6 +49,7 @@ interface ActiveTrip {
   };
 }
 
+// Inline feedback modal state type
 interface FeedbackModal {
   visible: boolean;
   title: string;
@@ -65,12 +75,14 @@ export default function HomeScreen() {
     type: 'info',
   });
   
+  // Form states
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
   const [selectedContactId, setSelectedContactId] = useState('');
   const [activityType, setActivityType] = useState('hiking');
   const [clothingDescription, setClothingDescription] = useState('');
   const [vehicleDescription, setVehicleDescription] = useState('');
   
+  // New contact form
   const [newContactName, setNewContactName] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
   
@@ -109,7 +121,7 @@ export default function HomeScreen() {
       console.log('HomeScreen: Starting location update interval (15 minutes)');
       locationUpdateInterval.current = setInterval(() => {
         updateTripLocation();
-      }, 15 * 60 * 1000);
+      }, 15 * 60 * 1000); // 15 minutes
       
       return () => {
         if (locationUpdateInterval.current) {
@@ -150,6 +162,7 @@ export default function HomeScreen() {
       setEmergencyContacts(contacts || []);
     } catch (error) {
       console.error('HomeScreen: Error loading emergency contacts:', error);
+      // Don't show error on initial load - user may just not have contacts yet
       setEmergencyContacts([]);
     }
   };
@@ -161,6 +174,7 @@ export default function HomeScreen() {
       console.log('HomeScreen: Active trip result', trip);
       if (trip && trip.id) {
         setActiveTrip(trip);
+        // Restore activityType from active trip
         setActivityType(trip.activityType);
       } else {
         setActiveTrip(null);
@@ -231,6 +245,7 @@ export default function HomeScreen() {
       console.log('HomeScreen: Trip started successfully', trip);
       setActiveTrip(trip);
       
+      // Send initial SMS
       await sendSMS(trip.emergencyContact.phoneNumber, 'start', latitude, longitude);
       
       setShowStartModal(false);
@@ -266,6 +281,7 @@ export default function HomeScreen() {
       console.log('HomeScreen: Location updated successfully', { latitude, longitude });
       setActiveTrip(updatedTrip);
       
+      // Send location update SMS
       await sendSMS(activeTrip.emergencyContact.phoneNumber, 'update', latitude, longitude);
       
       setCurrentLocation(location);
@@ -395,342 +411,353 @@ export default function HomeScreen() {
   };
 
   const activityTypes = [
-    { value: 'hiking', label: 'Hiking', icon: 'figure.hiking' },
-    { value: 'biking', label: 'Mountain Biking', icon: 'bicycle' },
-    { value: 'horseback', label: 'Horseback Riding', icon: 'pawprint' },
-    { value: 'utv', label: 'UTV/SXS', icon: 'car' },
+    { value: 'hiking', label: 'Hiking', icon: 'terrain' },
+    { value: 'biking', label: 'Mountain Biking', icon: 'directions-bike' },
+    { value: 'horseback', label: 'Horseback Riding', icon: 'pets' },
+    { value: 'utv', label: 'UTV/SXS', icon: 'directions-car' },
   ];
 
   if (initialLoading) {
     return (
       <>
-        <Stack.Screen options={{ headerShown: true, title: 'Safety Tracker', headerLargeTitle: true }} />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ marginTop: 12, color: colors.textSecondary, fontSize: 16 }}>Loading...</Text>
-        </View>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={styles.container} edges={['top']}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={{ marginTop: 12, color: colors.textSecondary, fontSize: 16 }}>Loading...</Text>
+          </View>
+        </SafeAreaView>
       </>
     );
   }
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: 'Safety Tracker',
-          headerLargeTitle: true,
-        }}
-      />
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-        {!hasLocationPermission && (
-          <View style={styles.warningCard}>
-            <IconSymbol ios_icon_name="exclamationmark.triangle" android_material_icon_name="warning" size={24} color={colors.accent} />
-            <Text style={styles.warningText}>Location permission required</Text>
-            <TouchableOpacity style={styles.warningButton} onPress={requestLocationPermission}>
-              <Text style={styles.warningButtonText}>Grant Permission</Text>
-            </TouchableOpacity>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.header}>
+            <Image 
+              source={resolveImageSource(require('@/assets/images/72090bad-4a5e-49d2-8aae-98dae4b6514d.png'))} 
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.headerTitle}>Safety Tracker</Text>
+            <Text style={styles.headerSubtitle}>Stay safe on your outdoor adventures</Text>
           </View>
-        )}
 
-        {activeTrip ? (
-          <View style={styles.activeCard}>
-            <View style={styles.activeHeader}>
-              <View style={styles.statusBadge}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusText}>Active Trip</Text>
+          {!hasLocationPermission && (
+            <View style={styles.warningCard}>
+              <IconSymbol ios_icon_name="exclamationmark.triangle" android_material_icon_name="warning" size={24} color={colors.accent} />
+              <Text style={styles.warningText}>Location permission required</Text>
+              <TouchableOpacity style={styles.warningButton} onPress={requestLocationPermission}>
+                <Text style={styles.warningButtonText}>Grant Permission</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {activeTrip ? (
+            <View style={styles.activeCard}>
+              <View style={styles.activeHeader}>
+                <View style={styles.statusBadge}>
+                  <View style={styles.statusDot} />
+                  <Text style={styles.statusText}>Active Trip</Text>
+                </View>
+                <Text style={styles.timerText}>{formatTime(elapsedTime)}</Text>
               </View>
-              <Text style={styles.timerText}>{formatTime(elapsedTime)}</Text>
-            </View>
 
-            <View style={styles.activityInfo}>
-              <IconSymbol ios_icon_name="figure.hiking" android_material_icon_name="terrain" size={32} color={colors.primary} />
-              <View style={styles.activityDetails}>
-                <Text style={styles.activityType}>{activityType.charAt(0).toUpperCase() + activityType.slice(1)}</Text>
-                <Text style={styles.contactName}>Contact: {activeTrip.emergencyContact.name}</Text>
+              <View style={styles.activityInfo}>
+                <IconSymbol ios_icon_name="figure.hiking" android_material_icon_name="terrain" size={32} color={colors.primary} />
+                <View style={styles.activityDetails}>
+                  <Text style={styles.activityType}>{activityType.charAt(0).toUpperCase() + activityType.slice(1)}</Text>
+                  <Text style={styles.contactName}>Contact: {activeTrip.emergencyContact.name}</Text>
+                </View>
               </View>
+
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.completeButton]}
+                  onPress={completeTrip}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <IconSymbol ios_icon_name="checkmark.circle" android_material_icon_name="check-circle" size={24} color="#FFFFFF" />
+                      <Text style={styles.actionButtonText}>Complete Trip</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.sosButton]}
+                  onPressIn={handleSOSLongPressIn}
+                  onPressOut={handleSOSLongPressOut}
+                  disabled={loading}
+                >
+                  <IconSymbol ios_icon_name="exclamationmark.triangle" android_material_icon_name="warning" size={24} color="#FFFFFF" />
+                  <Text style={styles.actionButtonText}>Hold for SOS</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.sosHint}>Hold SOS button for 5 seconds to send emergency alert</Text>
             </View>
-
-            <View style={styles.buttonRow}>
+          ) : (
+            <View style={styles.startCard}>
+              <IconSymbol ios_icon_name="location.circle" android_material_icon_name="location-on" size={64} color={colors.primary} style={styles.startIcon} />
+              <Text style={styles.startTitle}>Ready to Start?</Text>
+              <Text style={styles.startSubtitle}>Begin tracking your outdoor activity</Text>
+              
               <TouchableOpacity
-                style={[styles.actionButton, styles.completeButton]}
-                onPress={completeTrip}
-                disabled={loading}
+                style={styles.startButton}
+                onPress={() => setShowStartModal(true)}
+                disabled={!hasLocationPermission}
               >
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <>
-                    <IconSymbol ios_icon_name="checkmark.circle" android_material_icon_name="check-circle" size={24} color="#FFFFFF" />
-                    <Text style={styles.actionButtonText}>Complete Trip</Text>
-                  </>
-                )}
+                <Text style={styles.startButtonText}>Start Trip</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.actionButton, styles.sosButton]}
-                onPressIn={handleSOSLongPressIn}
-                onPressOut={handleSOSLongPressOut}
-                disabled={loading}
-              >
-                <IconSymbol ios_icon_name="exclamationmark.triangle" android_material_icon_name="warning" size={24} color="#FFFFFF" />
-                <Text style={styles.actionButtonText}>Hold for SOS</Text>
-              </TouchableOpacity>
+              {emergencyContacts.length === 0 && (
+                <TouchableOpacity
+                  style={styles.addContactButton}
+                  onPress={() => setShowContactModal(true)}
+                >
+                  <IconSymbol ios_icon_name="person.badge.plus" android_material_icon_name="person-add" size={20} color={colors.secondary} />
+                  <Text style={styles.addContactText}>Add Emergency Contact</Text>
+                </TouchableOpacity>
+              )}
             </View>
+          )}
 
-            <Text style={styles.sosHint}>Hold SOS button for 5 seconds to send emergency alert</Text>
-          </View>
-        ) : (
-          <View style={styles.startCard}>
-            <IconSymbol ios_icon_name="location.circle" android_material_icon_name="location-on" size={64} color={colors.primary} style={styles.startIcon} />
-            <Text style={styles.startTitle}>Ready to Start?</Text>
-            <Text style={styles.startSubtitle}>Begin tracking your outdoor activity</Text>
-            
-            <TouchableOpacity
-              style={styles.startButton}
-              onPress={() => setShowStartModal(true)}
-              disabled={!hasLocationPermission}
-            >
-              <Text style={styles.startButtonText}>Start Trip</Text>
-            </TouchableOpacity>
-
-            {emergencyContacts.length === 0 && (
-              <TouchableOpacity
-                style={styles.addContactButton}
-                onPress={() => setShowContactModal(true)}
-              >
-                <IconSymbol ios_icon_name="person.badge.plus" android_material_icon_name="person-add" size={20} color={colors.secondary} />
-                <Text style={styles.addContactText}>Add Emergency Contact</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {currentLocation && (
-          <View style={styles.locationCard}>
-            <Text style={styles.locationTitle}>Current Location</Text>
-            <Text style={styles.locationCoords}>
-              {currentLocation.coords.latitude.toFixed(6)}, {currentLocation.coords.longitude.toFixed(6)}
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-
-      <Modal visible={showStartModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Start Trip</Text>
-
-            <Text style={styles.inputLabel}>Activity Type</Text>
-            <View style={styles.activityGrid}>
-              {activityTypes.map((activity) => {
-                const isSelected = activityType === activity.value;
-                return (
-                  <TouchableOpacity
-                    key={activity.value}
-                    style={[styles.activityOption, isSelected && styles.activityOptionSelected]}
-                    onPress={() => setActivityType(activity.value)}
-                  >
-                    <IconSymbol
-                      ios_icon_name={activity.icon}
-                      android_material_icon_name={activity.icon}
-                      size={32}
-                      color={isSelected ? '#FFFFFF' : colors.primary}
-                    />
-                    <Text style={[styles.activityOptionText, isSelected && styles.activityOptionTextSelected]}>
-                      {activity.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+          {currentLocation && (
+            <View style={styles.locationCard}>
+              <Text style={styles.locationTitle}>Current Location</Text>
+              <Text style={styles.locationCoords}>
+                {currentLocation.coords.latitude.toFixed(6)}, {currentLocation.coords.longitude.toFixed(6)}
+              </Text>
             </View>
+          )}
+        </ScrollView>
 
-            <Text style={styles.inputLabel}>Emergency Contact</Text>
-            <View style={styles.contactList}>
-              {emergencyContacts.map((contact) => {
-                const isSelected = selectedContactId === contact.id;
-                return (
-                  <TouchableOpacity
-                    key={contact.id}
-                    style={[styles.contactOption, isSelected && styles.contactOptionSelected]}
-                    onPress={() => setSelectedContactId(contact.id)}
-                  >
-                    <View style={styles.contactInfo}>
-                      <Text style={[styles.contactName, isSelected && styles.contactNameSelected]}>{contact.name}</Text>
-                      <Text style={[styles.contactPhone, isSelected && styles.contactPhoneSelected]}>{contact.phoneNumber}</Text>
-                    </View>
-                    {isSelected && (
-                      <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={24} color="#FFFFFF" />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+        {/* Start Trip Modal */}
+        <Modal visible={showStartModal} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Start Trip</Text>
 
-            <TouchableOpacity
-              style={styles.addContactLink}
-              onPress={() => {
-                setShowStartModal(false);
-                setShowContactModal(true);
-              }}
-            >
-              <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={20} color={colors.secondary} />
-              <Text style={styles.addContactLinkText}>Add New Contact</Text>
-            </TouchableOpacity>
+              <Text style={styles.inputLabel}>Activity Type</Text>
+              <View style={styles.activityGrid}>
+                {activityTypes.map((activity) => {
+                  const isSelected = activityType === activity.value;
+                  return (
+                    <TouchableOpacity
+                      key={activity.value}
+                      style={[styles.activityOption, isSelected && styles.activityOptionSelected]}
+                      onPress={() => setActivityType(activity.value)}
+                    >
+                      <IconSymbol
+                        ios_icon_name={activity.icon}
+                        android_material_icon_name={activity.icon}
+                        size={32}
+                        color={isSelected ? '#FFFFFF' : colors.primary}
+                      />
+                      <Text style={[styles.activityOptionText, isSelected && styles.activityOptionTextSelected]}>
+                        {activity.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-            <Text style={styles.inputLabel}>Clothing Description (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., Red jacket, blue jeans"
-              value={clothingDescription}
-              onChangeText={setClothingDescription}
-              placeholderTextColor={colors.textSecondary}
-            />
+              <Text style={styles.inputLabel}>Emergency Contact</Text>
+              <View style={styles.contactList}>
+                {emergencyContacts.map((contact) => {
+                  const isSelected = selectedContactId === contact.id;
+                  return (
+                    <TouchableOpacity
+                      key={contact.id}
+                      style={[styles.contactOption, isSelected && styles.contactOptionSelected]}
+                      onPress={() => setSelectedContactId(contact.id)}
+                    >
+                      <View style={styles.contactInfo}>
+                        <Text style={[styles.contactName, isSelected && styles.contactNameSelected]}>{contact.name}</Text>
+                        <Text style={[styles.contactPhone, isSelected && styles.contactPhoneSelected]}>{contact.phoneNumber}</Text>
+                      </View>
+                      {isSelected && (
+                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={24} color="#FFFFFF" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-            <Text style={styles.inputLabel}>Vehicle Description (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., White Toyota 4Runner, plate ABC123"
-              value={vehicleDescription}
-              onChangeText={setVehicleDescription}
-              placeholderTextColor={colors.textSecondary}
-            />
-
-            <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={() => setShowStartModal(false)}
+                style={styles.addContactLink}
+                onPress={() => {
+                  setShowStartModal(false);
+                  setShowContactModal(true);
+                }}
               >
-                <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
+                <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={20} color={colors.secondary} />
+                <Text style={styles.addContactLinkText}>Add New Contact</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={startTrip}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.modalButtonText}>Start</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
-      <Modal visible={showContactModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Emergency Contact</Text>
-
-            <Text style={styles.inputLabel}>Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Contact name"
-              value={newContactName}
-              onChangeText={setNewContactName}
-              placeholderTextColor={colors.textSecondary}
-            />
-
-            <Text style={styles.inputLabel}>Phone Number</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="+1234567890"
-              value={newContactPhone}
-              onChangeText={setNewContactPhone}
-              keyboardType="phone-pad"
-              placeholderTextColor={colors.textSecondary}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={() => setShowContactModal(false)}
-              >
-                <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={addEmergencyContact}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.modalButtonText}>Add</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={showSOSModal} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <IconSymbol ios_icon_name="exclamationmark.triangle" android_material_icon_name="warning" size={64} color={colors.danger} style={styles.sosIcon} />
-            <Text style={styles.sosModalTitle}>Send SOS?</Text>
-            <Text style={styles.sosModalText}>
-              This will send an emergency message to your contact with your current location.
-            </Text>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={() => setShowSOSModal(false)}
-              >
-                <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.sosConfirmButton]}
-                onPress={triggerSOS}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.modalButtonText}>Send SOS</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Feedback Modal - replaces Alert.alert for web compatibility */}
-      <Modal visible={feedbackModal.visible} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={[
-              styles.feedbackIconContainer,
-              feedbackModal.type === 'error' && styles.feedbackIconError,
-              feedbackModal.type === 'success' && styles.feedbackIconSuccess,
-              feedbackModal.type === 'info' && styles.feedbackIconInfo,
-            ]}>
-              <IconSymbol
-                ios_icon_name={feedbackModal.type === 'error' ? 'exclamationmark.circle' : feedbackModal.type === 'success' ? 'checkmark.circle' : 'info.circle'}
-                android_material_icon_name={feedbackModal.type === 'error' ? 'error' : feedbackModal.type === 'success' ? 'check-circle' : 'info'}
-                size={40}
-                color={feedbackModal.type === 'error' ? colors.danger : feedbackModal.type === 'success' ? colors.primary : colors.secondary}
+              <Text style={styles.inputLabel}>Clothing Description (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., Red jacket, blue jeans"
+                value={clothingDescription}
+                onChangeText={setClothingDescription}
+                placeholderTextColor={colors.textSecondary}
               />
+
+              <Text style={styles.inputLabel}>Vehicle Description (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., White Toyota 4Runner, plate ABC123"
+                value={vehicleDescription}
+                onChangeText={setVehicleDescription}
+                placeholderTextColor={colors.textSecondary}
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonSecondary]}
+                  onPress={() => setShowStartModal(false)}
+                >
+                  <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonPrimary]}
+                  onPress={startTrip}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.modalButtonText}>Start</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-            <Text style={styles.feedbackTitle}>{feedbackModal.title}</Text>
-            <Text style={styles.feedbackMessage}>{feedbackModal.message}</Text>
-            <TouchableOpacity
-              style={[
-                styles.modalButton,
-                styles.modalButtonPrimary,
-                feedbackModal.type === 'error' && { backgroundColor: colors.danger },
-                feedbackModal.type === 'success' && { backgroundColor: colors.primary },
-              ]}
-              onPress={() => setFeedbackModal(prev => ({ ...prev, visible: false }))}
-            >
-              <Text style={styles.modalButtonText}>OK</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+
+        {/* Add Contact Modal */}
+        <Modal visible={showContactModal} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Add Emergency Contact</Text>
+
+              <Text style={styles.inputLabel}>Name</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Contact name"
+                value={newContactName}
+                onChangeText={setNewContactName}
+                placeholderTextColor={colors.textSecondary}
+              />
+
+              <Text style={styles.inputLabel}>Phone Number</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="+1234567890"
+                value={newContactPhone}
+                onChangeText={setNewContactPhone}
+                keyboardType="phone-pad"
+                placeholderTextColor={colors.textSecondary}
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonSecondary]}
+                  onPress={() => setShowContactModal(false)}
+                >
+                  <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonPrimary]}
+                  onPress={addEmergencyContact}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.modalButtonText}>Add</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* SOS Confirmation Modal */}
+        <Modal visible={showSOSModal} animationType="fade" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <IconSymbol ios_icon_name="exclamationmark.triangle" android_material_icon_name="warning" size={64} color={colors.danger} style={styles.sosIcon} />
+              <Text style={styles.sosModalTitle}>Send SOS?</Text>
+              <Text style={styles.sosModalText}>
+                This will send an emergency message to your contact with your current location.
+              </Text>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonSecondary]}
+                  onPress={() => setShowSOSModal(false)}
+                >
+                  <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.sosConfirmButton]}
+                  onPress={triggerSOS}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.modalButtonText}>Send SOS</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Feedback Modal - replaces Alert.alert for web compatibility */}
+        <Modal visible={feedbackModal.visible} animationType="fade" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={[
+                styles.feedbackIconContainer,
+                feedbackModal.type === 'error' && styles.feedbackIconError,
+                feedbackModal.type === 'success' && styles.feedbackIconSuccess,
+                feedbackModal.type === 'info' && styles.feedbackIconInfo,
+              ]}>
+                <IconSymbol
+                  ios_icon_name={feedbackModal.type === 'error' ? 'exclamationmark.circle' : feedbackModal.type === 'success' ? 'checkmark.circle' : 'info.circle'}
+                  android_material_icon_name={feedbackModal.type === 'error' ? 'error' : feedbackModal.type === 'success' ? 'check-circle' : 'info'}
+                  size={40}
+                  color={feedbackModal.type === 'error' ? colors.danger : feedbackModal.type === 'success' ? colors.primary : colors.secondary}
+                />
+              </View>
+              <Text style={styles.feedbackTitle}>{feedbackModal.title}</Text>
+              <Text style={styles.feedbackMessage}>{feedbackModal.message}</Text>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonPrimary,
+                  feedbackModal.type === 'error' && { backgroundColor: colors.danger },
+                  feedbackModal.type === 'success' && { backgroundColor: colors.primary },
+                ]}
+                onPress={() => setFeedbackModal(prev => ({ ...prev, visible: false }))}
+              >
+                <Text style={styles.modalButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </SafeAreaView>
     </>
   );
 }
@@ -740,8 +767,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
     padding: 16,
+  },
+  header: {
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
   },
   warningCard: {
     backgroundColor: '#FEF3C7',
