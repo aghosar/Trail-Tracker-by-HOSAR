@@ -103,7 +103,7 @@ export default function AuthScreen() {
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={styles.appName}>Safety Tracker</Text>
+            <Text style={styles.appName}>Trail Tracker</Text>
             <Text style={styles.appTagline}>Stay safe on your outdoor adventures</Text>
           </View>
 
