@@ -542,20 +542,20 @@ export default function HomeScreen() {
   };
 
   const handleDonatePress = async () => {
-    console.log('HomeScreen: Opening PayPal donation page');
-    const paypalUrl = 'https://www.paypal.com/donate?token=sA4kTX-n6zMzAD8gQLbmCAccCFPv9G4vBr9PTTQ8Jjlh2jnSEuw6B69MryVZat_PBaS4A8iwqCWeIdO5';
+    console.log('HomeScreen: Opening HOSAR donation page');
+    const hosarUrl = 'https://hosar.org/#';
     
     try {
-      const canOpen = await Linking.canOpenURL(paypalUrl);
+      const canOpen = await Linking.canOpenURL(hosarUrl);
       if (canOpen) {
-        await Linking.openURL(paypalUrl);
-        console.log('HomeScreen: PayPal donation page opened successfully');
+        await Linking.openURL(hosarUrl);
+        console.log('HomeScreen: HOSAR donation page opened successfully');
       } else {
-        console.log('HomeScreen: Cannot open PayPal URL');
+        console.log('HomeScreen: Cannot open HOSAR URL');
         showFeedback('Error', 'Unable to open donation page', 'error');
       }
     } catch (error) {
-      console.error('HomeScreen: Error opening PayPal donation page:', error);
+      console.error('HomeScreen: Error opening HOSAR donation page:', error);
       showFeedback('Error', 'Unable to open donation page', 'error');
     }
   };
