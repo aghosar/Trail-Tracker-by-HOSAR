@@ -3,25 +3,25 @@ import { StyleSheet } from 'react-native';
 
 // Outdoor safety theme colors
 export const colors = {
-  // Light mode
-  background: '#F5F7FA',
-  card: '#FFFFFF',
-  text: '#1A2332',
-  textSecondary: '#6B7280',
+  // Dark theme (black background)
+  background: '#000000',
+  card: '#1A1A1A',
+  text: '#FFFFFF',
+  textSecondary: '#A0A0A0',
   primary: '#10B981', // Green for safety/go
   secondary: '#3B82F6', // Blue for info
   accent: '#F59E0B', // Amber for warnings
   danger: '#EF4444', // Red for SOS/danger
   success: '#10B981',
-  border: '#E5E7EB',
-  highlight: '#DBEAFE',
+  border: '#333333',
+  highlight: '#1E3A5F',
   
-  // Dark mode variants
-  darkBackground: '#0F172A',
-  darkCard: '#1E293B',
-  darkText: '#F1F5F9',
-  darkTextSecondary: '#94A3B8',
-  darkBorder: '#334155',
+  // Legacy light mode variants (kept for compatibility)
+  darkBackground: '#000000',
+  darkCard: '#1A1A1A',
+  darkText: '#FFFFFF',
+  darkTextSecondary: '#A0A0A0',
+  darkBorder: '#333333',
 };
 
 export const commonStyles = StyleSheet.create({

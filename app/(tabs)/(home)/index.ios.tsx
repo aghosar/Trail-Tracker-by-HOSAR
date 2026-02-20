@@ -88,7 +88,6 @@ export default function HomeScreen() {
   const [newContactName, setNewContactName] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
   
-  const locationUpdateInterval = useRef<NodeJS.Timeout | null>(null);
   const sosLongPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   const showFeedback = (title: string, message: string, type: 'error' | 'success' | 'info' = 'info') => {
@@ -117,21 +116,6 @@ export default function HomeScreen() {
       return () => clearInterval(timer);
     }
   }, [activeTrip]);
-
-  useEffect(() => {
-    if (activeTrip && hasLocationPermission) {
-      console.log('HomeScreen: Starting location update interval (15 minutes)');
-      locationUpdateInterval.current = setInterval(() => {
-        updateTripLocation();
-      }, 15 * 60 * 1000);
-      
-      return () => {
-        if (locationUpdateInterval.current) {
-          clearInterval(locationUpdateInterval.current);
-        }
-      };
-    }
-  }, [activeTrip, hasLocationPermission]);
 
   const requestLocationPermission = async () => {
     try {
@@ -368,7 +352,7 @@ export default function HomeScreen() {
       const vehicleInfo = vehicleDescription ? `\nVehicle: ${vehicleDescription}` : '';
       
       if (type === 'start') {
-        message = `🚨 SAFETY ALERT: I'm starting a ${activityName} trip.\nLocation: ${mapsUrl}${clothingInfo}${vehicleInfo}\nYou'll receive updates every 15 minutes.`;
+        message = `🚨 SAFETY ALERT: I'm starting a ${activityName} trip.\nLocation: ${mapsUrl}${clothingInfo}${vehicleInfo}`;
       } else if (type === 'update') {
         message = `📍 Location Update: Still on my ${activityName} trip.\nCurrent location: ${mapsUrl}`;
       } else if (type === 'complete') {
