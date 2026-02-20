@@ -417,17 +417,23 @@ export default function HomeScreen() {
     }
   };
 
-  const handleDonatePress = () => {
-    console.log('HomeScreen: Opening PayPal donation email');
-    const email = 'a.gillis@hosar.org';
-    const subject = 'Donation to HOSAR';
-    const body = 'I would like to make a donation to HOSAR.';
-    const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const handleDonatePress = async () => {
+    console.log('HomeScreen: Opening PayPal donation page');
+    const paypalUrl = 'https://www.paypal.com/donate?token=sA4kTX-n6zMzAD8gQLbmCAccCFPv9G4vBr9PTTQ8Jjlh2jnSEuw6B69MryVZat_PBaS4A8iwqCWeIdO5';
     
-    Linking.openURL(mailtoUrl).catch((error) => {
-      console.error('HomeScreen: Error opening email client:', error);
-      showFeedback('Error', 'Unable to open email client', 'error');
-    });
+    try {
+      const canOpen = await Linking.canOpenURL(paypalUrl);
+      if (canOpen) {
+        await Linking.openURL(paypalUrl);
+        console.log('HomeScreen: PayPal donation page opened successfully');
+      } else {
+        console.log('HomeScreen: Cannot open PayPal URL');
+        showFeedback('Error', 'Unable to open donation page', 'error');
+      }
+    } catch (error) {
+      console.error('HomeScreen: Error opening PayPal donation page:', error);
+      showFeedback('Error', 'Unable to open donation page', 'error');
+    }
   };
 
   const activityTypes = [
