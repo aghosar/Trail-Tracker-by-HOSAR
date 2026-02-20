@@ -20,6 +20,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import { authenticatedGet, authenticatedPost, authenticatedPut } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
+import Map from '@/components/Map';
 
 // Helper to resolve image sources (handles both local require() and remote URLs)
 function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
@@ -417,6 +418,19 @@ export default function HomeScreen() {
     }
   };
 
+  const handleDonatePress = () => {
+    console.log('HomeScreen: Opening PayPal donation email');
+    const email = 'a.gillis@hosar.org';
+    const subject = 'Donation to HOSAR';
+    const body = 'I would like to make a donation to HOSAR.';
+    const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    Linking.openURL(mailtoUrl).catch((error) => {
+      console.error('HomeScreen: Error opening email client:', error);
+      showFeedback('Error', 'Unable to open email client', 'error');
+    });
+  };
+
   const activityTypes = [
     { value: 'hiking', label: 'Hiking' },
     { value: 'biking', label: 'Mountain Biking' },
@@ -496,12 +510,39 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={styles.startCard}>
+            {currentLocation && (
+              <View style={styles.mapContainer}>
+                <Map
+                  initialRegion={{
+                    latitude: currentLocation.coords.latitude,
+                    longitude: currentLocation.coords.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }}
+                  markers={[{
+                    id: 'current',
+                    latitude: currentLocation.coords.latitude,
+                    longitude: currentLocation.coords.longitude,
+                    title: 'Your Location',
+                  }]}
+                  style={styles.map}
+                />
+              </View>
+            )}
+
             <TouchableOpacity
               style={styles.startButton}
               onPress={() => setShowStartModal(true)}
               disabled={!hasLocationPermission}
             >
               <Text style={styles.startButtonText}>Start Trip</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.donateButton}
+              onPress={handleDonatePress}
+            >
+              <Text style={styles.donateButtonText}>Donate to HOSAR</Text>
             </TouchableOpacity>
 
             {emergencyContacts.length === 0 && (
@@ -873,6 +914,15 @@ const styles = StyleSheet.create({
   startCard: {
     alignItems: 'center',
   },
+  mapContainer: {
+    width: '100%',
+    marginBottom: 16,
+  },
+  map: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+  },
   startButton: {
     backgroundColor: colors.primary,
     paddingHorizontal: 40,
@@ -883,6 +933,18 @@ const styles = StyleSheet.create({
   startButtonText: {
     color: '#FFFFFF',
     fontSize: 17,
+    fontWeight: '600',
+  },
+  donateButton: {
+    backgroundColor: '#0070BA',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  donateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '600',
   },
   addContactButton: {
