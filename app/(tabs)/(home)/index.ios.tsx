@@ -337,7 +337,15 @@ export default function HomeScreen() {
   };
 
   const updateTripLocation = async () => {
-    if (!activeTrip || !hasLocationPermission) {
+    if (!activeTrip) {
+      console.log('HomeScreen: Check In aborted - no active trip');
+      showFeedback('No Active Trip', 'Please start a trip first', 'error');
+      return;
+    }
+    
+    if (!hasLocationPermission) {
+      console.log('HomeScreen: Check In aborted - no location permission');
+      showFeedback('Location Permission Required', 'Please grant location permission to check in', 'error');
       return;
     }
     
@@ -345,27 +353,54 @@ export default function HomeScreen() {
     setCheckInLoading(true);
     
     try {
+      console.log('HomeScreen: Getting current location for check-in');
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
       
-      const { latitude, longitude } = location.coords;
+      if (!location || !location.coords) {
+        throw new Error('Unable to get current location');
+      }
       
+      const { latitude, longitude } = location.coords;
+      console.log('HomeScreen: Got location for check-in', { latitude, longitude });
+      
+      console.log('HomeScreen: Sending location update to backend', { tripId: activeTrip.id });
       const updatedTrip = await authenticatedPut<ActiveTrip>(`/api/trips/${activeTrip.id}/location`, {
         latitude: latitude.toString(),
         longitude: longitude.toString(),
       });
       
-      console.log('HomeScreen: Location updated successfully', { latitude, longitude });
+      console.log('HomeScreen: Location updated successfully on backend', updatedTrip);
       setActiveTrip(updatedTrip);
       
+      console.log('HomeScreen: Opening SMS for check-in notification');
       await sendSMS(activeTrip.emergencyContact.phoneNumber, 'update', latitude, longitude);
       
       setCurrentLocation(location);
       showFeedback('Check In Sent', 'Your updated location has been sent to your emergency contact.', 'success');
     } catch (error: any) {
       console.error('HomeScreen: Error updating trip location:', error);
-      showFeedback('Check In Failed', error.message || 'Failed to send location update', 'error');
+      
+      let errorMessage = 'Failed to send location update';
+      
+      if (error.message) {
+        if (error.message.includes('location') || error.message.includes('Location')) {
+          errorMessage = 'Unable to get your current location. Please check your location settings.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('401') || error.message.includes('unauthorized')) {
+          errorMessage = 'Session expired. Please log in again.';
+        } else if (error.message.includes('404')) {
+          errorMessage = 'Trip not found. Please restart your trip.';
+        } else if (error.message.includes('500') || error.message.includes('server')) {
+          errorMessage = 'Server error. Please try again later.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      showFeedback('Check In Failed', errorMessage, 'error');
     } finally {
       setCheckInLoading(false);
     }
