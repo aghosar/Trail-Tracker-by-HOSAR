@@ -4,7 +4,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   TextInput,
   Modal,
@@ -12,6 +11,7 @@ import {
   Image,
   ImageSourcePropType,
   Platform,
+  Linking,
 } from 'react-native';
 import { colors } from '@/styles/commonStyles';
 import { Stack } from 'expo-router';
@@ -67,6 +67,7 @@ export default function HomeScreen() {
   const [showStartModal, setShowStartModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showSOSModal, setShowSOSModal] = useState(false);
+  const [showActivityDropdown, setShowActivityDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModal>({
@@ -95,7 +96,7 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    if (!user) return; // Don't initialize until user is authenticated
+    if (!user) return;
     console.log('HomeScreen: Initializing for user', user.id);
     const init = async () => {
       await requestLocationPermission();
@@ -122,7 +123,7 @@ export default function HomeScreen() {
       console.log('HomeScreen: Starting location update interval (15 minutes)');
       locationUpdateInterval.current = setInterval(() => {
         updateTripLocation();
-      }, 15 * 60 * 1000); // 15 minutes
+      }, 15 * 60 * 1000);
       
       return () => {
         if (locationUpdateInterval.current) {
@@ -163,7 +164,6 @@ export default function HomeScreen() {
       setEmergencyContacts(contacts || []);
     } catch (error) {
       console.error('HomeScreen: Error loading emergency contacts:', error);
-      // Don't show error on initial load - user may just not have contacts yet
       setEmergencyContacts([]);
     }
   };
@@ -175,7 +175,6 @@ export default function HomeScreen() {
       console.log('HomeScreen: Active trip result', trip);
       if (trip && trip.id) {
         setActiveTrip(trip);
-        // Restore activityType from active trip
         setActivityType(trip.activityType);
       } else {
         setActiveTrip(null);
@@ -221,6 +220,16 @@ export default function HomeScreen() {
       return;
     }
     
+    if (!clothingDescription.trim()) {
+      showFeedback('Missing Information', 'Clothing description is required', 'error');
+      return;
+    }
+    
+    if (!vehicleDescription.trim()) {
+      showFeedback('Missing Information', 'Vehicle description is required', 'error');
+      return;
+    }
+    
     if (!currentLocation) {
       showFeedback('Location Unavailable', 'Unable to get current location. Please try again.', 'error');
       return;
@@ -237,16 +246,15 @@ export default function HomeScreen() {
         activityType,
         latitude: latitude.toString(),
         longitude: longitude.toString(),
+        clothingDescription: clothingDescription.trim(),
+        vehicleDescription: vehicleDescription.trim(),
       };
-      if (clothingDescription.trim()) body.clothingDescription = clothingDescription.trim();
-      if (vehicleDescription.trim()) body.vehicleDescription = vehicleDescription.trim();
 
       const trip = await authenticatedPost<ActiveTrip>('/api/trips/start', body);
       
       console.log('HomeScreen: Trip started successfully', trip);
       setActiveTrip(trip);
       
-      // Send initial SMS
       await sendSMS(trip.emergencyContact.phoneNumber, 'start', latitude, longitude);
       
       setShowStartModal(false);
@@ -282,7 +290,6 @@ export default function HomeScreen() {
       console.log('HomeScreen: Location updated successfully', { latitude, longitude });
       setActiveTrip(updatedTrip);
       
-      // Send location update SMS
       await sendSMS(activeTrip.emergencyContact.phoneNumber, 'update', latitude, longitude);
       
       setCurrentLocation(location);
@@ -353,22 +360,6 @@ export default function HomeScreen() {
 
   const sendSMS = async (phoneNumber: string, type: 'start' | 'update' | 'complete' | 'sos', lat: number, lon: number) => {
     try {
-      const isAvailable = await SMS.isAvailableAsync();
-      
-      if (!isAvailable) {
-        console.log('HomeScreen: SMS not available - device does not support SMS or running on simulator');
-        
-        // Show user-friendly message only on real devices (not simulator)
-        if (Platform.OS !== 'web') {
-          showFeedback(
-            'SMS Unavailable',
-            'SMS messaging is not available on this device. Your trip is still being tracked, but text notifications cannot be sent.',
-            'info'
-          );
-        }
-        return;
-      }
-      
       const mapsUrl = `https://maps.google.com/?q=${lat},${lon}`;
       let message = '';
       
@@ -386,23 +377,28 @@ export default function HomeScreen() {
         message = `🆘 EMERGENCY SOS: I need help!\nActivity: ${activityName}\nLocation: ${mapsUrl}${clothingInfo}${vehicleInfo}\nPlease call emergency services!`;
       }
       
-      console.log('HomeScreen: Sending SMS', { type, phoneNumber, messageLength: message.length });
+      console.log('HomeScreen: Opening SMS app', { type, phoneNumber, messageLength: message.length });
       
-      const result = await SMS.sendSMSAsync([phoneNumber], message);
+      const smsUrl = `sms:${phoneNumber}&body=${encodeURIComponent(message)}`;
       
-      if (result.result === 'sent') {
-        console.log('HomeScreen: SMS sent successfully');
-      } else if (result.result === 'cancelled') {
-        console.log('HomeScreen: SMS cancelled by user');
-        showFeedback('SMS Cancelled', 'The SMS message was not sent because you cancelled it.', 'info');
+      const canOpen = await Linking.canOpenURL(smsUrl);
+      
+      if (canOpen) {
+        await Linking.openURL(smsUrl);
+        console.log('HomeScreen: SMS app opened successfully');
       } else {
-        console.log('HomeScreen: SMS result unknown:', result.result);
+        console.log('HomeScreen: Cannot open SMS URL');
+        showFeedback(
+          'SMS Unavailable',
+          'Unable to open SMS app. Please send the message manually.',
+          'error'
+        );
       }
     } catch (error) {
-      console.error('HomeScreen: Error sending SMS:', error);
+      console.error('HomeScreen: Error opening SMS:', error);
       showFeedback(
         'SMS Error',
-        'Failed to send SMS notification. Your trip is still being tracked.',
+        'Failed to open SMS app. Your trip is still being tracked.',
         'error'
       );
     }
@@ -435,11 +431,13 @@ export default function HomeScreen() {
   };
 
   const activityTypes = [
-    { value: 'hiking', label: 'Hiking', icon: 'terrain' },
-    { value: 'biking', label: 'Mountain Biking', icon: 'directions-bike' },
-    { value: 'horseback', label: 'Horseback Riding', icon: 'pets' },
-    { value: 'utv', label: 'UTV/SXS', icon: 'directions-car' },
+    { value: 'hiking', label: 'Hiking' },
+    { value: 'biking', label: 'Mountain Biking' },
+    { value: 'horseback', label: 'Horseback Riding' },
+    { value: 'utv', label: 'UTV/SXS' },
   ];
+
+  const selectedActivityLabel = activityTypes.find(a => a.value === activityType)?.label || 'Select Activity';
 
   if (initialLoading) {
     return (
@@ -459,23 +457,21 @@ export default function HomeScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.container} edges={['top']}>
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.content}>
           <View style={styles.header}>
             <Image 
               source={resolveImageSource(require('@/assets/images/72090bad-4a5e-49d2-8aae-98dae4b6514d.png'))} 
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={styles.headerTitle}>Safety Tracker</Text>
-            <Text style={styles.headerSubtitle}>Stay safe on your outdoor adventures</Text>
           </View>
 
           {!hasLocationPermission && (
             <View style={styles.warningCard}>
-              <IconSymbol ios_icon_name="exclamationmark.triangle" android_material_icon_name="warning" size={24} color={colors.accent} />
-              <Text style={styles.warningText}>Location permission required</Text>
+              <IconSymbol ios_icon_name="exclamationmark.triangle" android_material_icon_name="warning" size={20} color={colors.accent} />
+              <Text style={styles.warningText}>Location required</Text>
               <TouchableOpacity style={styles.warningButton} onPress={requestLocationPermission}>
-                <Text style={styles.warningButtonText}>Grant Permission</Text>
+                <Text style={styles.warningButtonText}>Grant</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -485,18 +481,13 @@ export default function HomeScreen() {
               <View style={styles.activeHeader}>
                 <View style={styles.statusBadge}>
                   <View style={styles.statusDot} />
-                  <Text style={styles.statusText}>Active Trip</Text>
+                  <Text style={styles.statusText}>Active</Text>
                 </View>
                 <Text style={styles.timerText}>{formatTime(elapsedTime)}</Text>
               </View>
 
-              <View style={styles.activityInfo}>
-                <IconSymbol ios_icon_name="figure.hiking" android_material_icon_name="terrain" size={32} color={colors.primary} />
-                <View style={styles.activityDetails}>
-                  <Text style={styles.activityType}>{activityType.charAt(0).toUpperCase() + activityType.slice(1)}</Text>
-                  <Text style={styles.contactName}>Contact: {activeTrip.emergencyContact.name}</Text>
-                </View>
-              </View>
+              <Text style={styles.activityType}>{activityType.charAt(0).toUpperCase() + activityType.slice(1)}</Text>
+              <Text style={styles.contactName}>{activeTrip.emergencyContact.name}</Text>
 
               <View style={styles.buttonRow}>
                 <TouchableOpacity
@@ -505,12 +496,9 @@ export default function HomeScreen() {
                   disabled={loading}
                 >
                   {loading ? (
-                    <ActivityIndicator color="#FFFFFF" />
+                    <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <>
-                      <IconSymbol ios_icon_name="checkmark.circle" android_material_icon_name="check-circle" size={24} color="#FFFFFF" />
-                      <Text style={styles.actionButtonText}>Complete Trip</Text>
-                    </>
+                    <Text style={styles.actionButtonText}>Complete</Text>
                   )}
                 </TouchableOpacity>
 
@@ -520,19 +508,12 @@ export default function HomeScreen() {
                   onPressOut={handleSOSLongPressOut}
                   disabled={loading}
                 >
-                  <IconSymbol ios_icon_name="exclamationmark.triangle" android_material_icon_name="warning" size={24} color="#FFFFFF" />
-                  <Text style={styles.actionButtonText}>Hold for SOS</Text>
+                  <Text style={styles.actionButtonText}>Hold SOS</Text>
                 </TouchableOpacity>
               </View>
-
-              <Text style={styles.sosHint}>Hold SOS button for 5 seconds to send emergency alert</Text>
             </View>
           ) : (
             <View style={styles.startCard}>
-              <IconSymbol ios_icon_name="location.circle" android_material_icon_name="location-on" size={64} color={colors.primary} style={styles.startIcon} />
-              <Text style={styles.startTitle}>Ready to Start?</Text>
-              <Text style={styles.startSubtitle}>Begin tracking your outdoor activity</Text>
-              
               <TouchableOpacity
                 style={styles.startButton}
                 onPress={() => setShowStartModal(true)}
@@ -546,22 +527,12 @@ export default function HomeScreen() {
                   style={styles.addContactButton}
                   onPress={() => setShowContactModal(true)}
                 >
-                  <IconSymbol ios_icon_name="person.badge.plus" android_material_icon_name="person-add" size={20} color={colors.secondary} />
                   <Text style={styles.addContactText}>Add Emergency Contact</Text>
                 </TouchableOpacity>
               )}
             </View>
           )}
-
-          {currentLocation && (
-            <View style={styles.locationCard}>
-              <Text style={styles.locationTitle}>Current Location</Text>
-              <Text style={styles.locationCoords}>
-                {currentLocation.coords.latitude.toFixed(6)}, {currentLocation.coords.longitude.toFixed(6)}
-              </Text>
-            </View>
-          )}
-        </ScrollView>
+        </View>
 
         {/* Start Trip Modal */}
         <Modal visible={showStartModal} animationType="slide" transparent>
@@ -569,31 +540,46 @@ export default function HomeScreen() {
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Start Trip</Text>
 
-              <Text style={styles.inputLabel}>Activity Type</Text>
-              <View style={styles.activityGrid}>
-                {activityTypes.map((activity) => {
-                  const isSelected = activityType === activity.value;
-                  return (
+              <Text style={styles.inputLabel}>Activity Type *</Text>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => setShowActivityDropdown(!showActivityDropdown)}
+              >
+                <Text style={styles.dropdownButtonText}>{selectedActivityLabel}</Text>
+                <IconSymbol
+                  ios_icon_name="chevron.down"
+                  android_material_icon_name="arrow-drop-down"
+                  size={24}
+                  color={colors.text}
+                />
+              </TouchableOpacity>
+
+              {showActivityDropdown && (
+                <View style={styles.dropdownList}>
+                  {activityTypes.map((activity) => (
                     <TouchableOpacity
                       key={activity.value}
-                      style={[styles.activityOption, isSelected && styles.activityOptionSelected]}
-                      onPress={() => setActivityType(activity.value)}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setActivityType(activity.value);
+                        setShowActivityDropdown(false);
+                      }}
                     >
-                      <IconSymbol
-                        ios_icon_name={activity.icon}
-                        android_material_icon_name={activity.icon}
-                        size={32}
-                        color={isSelected ? '#FFFFFF' : colors.primary}
-                      />
-                      <Text style={[styles.activityOptionText, isSelected && styles.activityOptionTextSelected]}>
-                        {activity.label}
-                      </Text>
+                      <Text style={styles.dropdownItemText}>{activity.label}</Text>
+                      {activityType === activity.value && (
+                        <IconSymbol
+                          ios_icon_name="checkmark"
+                          android_material_icon_name="check"
+                          size={20}
+                          color={colors.primary}
+                        />
+                      )}
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
+                  ))}
+                </View>
+              )}
 
-              <Text style={styles.inputLabel}>Emergency Contact</Text>
+              <Text style={styles.inputLabel}>Emergency Contact *</Text>
               <View style={styles.contactList}>
                 {emergencyContacts.map((contact) => {
                   const isSelected = selectedContactId === contact.id;
@@ -604,11 +590,11 @@ export default function HomeScreen() {
                       onPress={() => setSelectedContactId(contact.id)}
                     >
                       <View style={styles.contactInfo}>
-                        <Text style={[styles.contactName, isSelected && styles.contactNameSelected]}>{contact.name}</Text>
+                        <Text style={[styles.contactNameText, isSelected && styles.contactNameSelected]}>{contact.name}</Text>
                         <Text style={[styles.contactPhone, isSelected && styles.contactPhoneSelected]}>{contact.phoneNumber}</Text>
                       </View>
                       {isSelected && (
-                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={24} color="#FFFFFF" />
+                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color="#FFFFFF" />
                       )}
                     </TouchableOpacity>
                   );
@@ -622,11 +608,10 @@ export default function HomeScreen() {
                   setShowContactModal(true);
                 }}
               >
-                <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={20} color={colors.secondary} />
-                <Text style={styles.addContactLinkText}>Add New Contact</Text>
+                <Text style={styles.addContactLinkText}>+ Add New Contact</Text>
               </TouchableOpacity>
 
-              <Text style={styles.inputLabel}>Clothing Description (Optional)</Text>
+              <Text style={styles.inputLabel}>Clothing Description *</Text>
               <TextInput
                 style={styles.input}
                 placeholder="e.g., Red jacket, blue jeans"
@@ -635,10 +620,10 @@ export default function HomeScreen() {
                 placeholderTextColor={colors.textSecondary}
               />
 
-              <Text style={styles.inputLabel}>Vehicle Description (Optional)</Text>
+              <Text style={styles.inputLabel}>Vehicle Description *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g., White Toyota 4Runner, plate ABC123"
+                placeholder="e.g., White Toyota 4Runner, ABC123"
                 value={vehicleDescription}
                 onChangeText={setVehicleDescription}
                 placeholderTextColor={colors.textSecondary}
@@ -657,7 +642,7 @@ export default function HomeScreen() {
                   disabled={loading}
                 >
                   {loading ? (
-                    <ActivityIndicator color="#FFFFFF" />
+                    <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
                     <Text style={styles.modalButtonText}>Start</Text>
                   )}
@@ -705,7 +690,7 @@ export default function HomeScreen() {
                   disabled={loading}
                 >
                   {loading ? (
-                    <ActivityIndicator color="#FFFFFF" />
+                    <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
                     <Text style={styles.modalButtonText}>Add</Text>
                   )}
@@ -719,7 +704,7 @@ export default function HomeScreen() {
         <Modal visible={showSOSModal} animationType="fade" transparent>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <IconSymbol ios_icon_name="exclamationmark.triangle" android_material_icon_name="warning" size={64} color={colors.danger} style={styles.sosIcon} />
+              <IconSymbol ios_icon_name="exclamationmark.triangle" android_material_icon_name="warning" size={48} color={colors.danger} style={styles.sosIcon} />
               <Text style={styles.sosModalTitle}>Send SOS?</Text>
               <Text style={styles.sosModalText}>
                 This will send an emergency message to your contact with your current location.
@@ -738,7 +723,7 @@ export default function HomeScreen() {
                   disabled={loading}
                 >
                   {loading ? (
-                    <ActivityIndicator color="#FFFFFF" />
+                    <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
                     <Text style={styles.modalButtonText}>Send SOS</Text>
                   )}
@@ -748,7 +733,7 @@ export default function HomeScreen() {
           </View>
         </Modal>
 
-        {/* Feedback Modal - replaces Alert.alert for web compatibility */}
+        {/* Feedback Modal */}
         <Modal visible={feedbackModal.visible} animationType="fade" transparent>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -761,7 +746,7 @@ export default function HomeScreen() {
                 <IconSymbol
                   ios_icon_name={feedbackModal.type === 'error' ? 'exclamationmark.circle' : feedbackModal.type === 'success' ? 'checkmark.circle' : 'info.circle'}
                   android_material_icon_name={feedbackModal.type === 'error' ? 'error' : feedbackModal.type === 'success' ? 'check-circle' : 'info'}
-                  size={40}
+                  size={32}
                   color={feedbackModal.type === 'error' ? colors.danger : feedbackModal.type === 'success' ? colors.primary : colors.secondary}
                 />
               </View>
@@ -791,62 +776,48 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  scrollView: {
+  content: {
     flex: 1,
-  },
-  scrollContent: {
     padding: 16,
   },
   header: {
-    marginBottom: 24,
     alignItems: 'center',
-  },
-  logo: {
-    width: 200,
-    height: 200,
     marginBottom: 16,
   },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
+  logo: {
+    width: 280,
+    height: 280,
   },
   warningCard: {
     backgroundColor: '#FEF3C7',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   warningText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     color: '#92400E',
     fontWeight: '500',
   },
   warningButton: {
     backgroundColor: colors.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
   warningButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   activeCard: {
     backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -857,65 +828,54 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#D1FAE5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    gap: 4,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: colors.primary,
   },
   statusText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#065F46',
   },
   timerText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
   },
-  activityInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 20,
-  },
-  activityDetails: {
-    flex: 1,
-  },
   activityType: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: colors.text,
     marginBottom: 4,
   },
   contactName: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
+    marginBottom: 12,
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    gap: 10,
   },
   actionButton: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
   },
   completeButton: {
     backgroundColor: colors.primary,
@@ -925,85 +885,31 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
-  sosHint: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
   startCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 32,
-    marginBottom: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  startIcon: {
-    marginBottom: 16,
-  },
-  startTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  startSubtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginBottom: 24,
-    textAlign: 'center',
   },
   startButton: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 48,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 12,
   },
   startButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
   },
   addContactButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
     paddingVertical: 8,
   },
   addContactText: {
     color: colors.secondary,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
-  },
-  locationCard: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  locationTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  locationCoords: {
-    fontSize: 16,
-    color: colors.text,
-    fontFamily: 'Courier',
   },
   modalOverlay: {
     flex: 1,
@@ -1014,70 +920,77 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 12,
+    padding: 20,
     width: '100%',
     maxWidth: 400,
+    maxHeight: '90%',
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 8,
-    marginTop: 12,
+    marginBottom: 6,
+    marginTop: 10,
   },
   input: {
     backgroundColor: colors.background,
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    padding: 10,
+    fontSize: 15,
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  activityGrid: {
+  dropdownButton: {
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 15,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dropdownButtonText: {
+    fontSize: 15,
+    color: colors.text,
+  },
+  dropdownList: {
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: 4,
     marginBottom: 8,
   },
-  activityOption: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 16,
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.border,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  activityOptionSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  activityOptionText: {
-    fontSize: 14,
-    fontWeight: '500',
+  dropdownItemText: {
+    fontSize: 15,
     color: colors.text,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  activityOptionTextSelected: {
-    color: '#FFFFFF',
   },
   contactList: {
-    gap: 8,
+    gap: 6,
   },
   contactOption: {
     backgroundColor: colors.background,
     borderRadius: 8,
-    padding: 12,
+    padding: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1091,8 +1004,13 @@ const styles = StyleSheet.create({
   contactInfo: {
     flex: 1,
   },
-  contactPhone: {
+  contactNameText: {
     fontSize: 14,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  contactPhone: {
+    fontSize: 13,
     color: colors.textSecondary,
   },
   contactPhoneSelected: {
@@ -1102,11 +1020,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   addContactLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
     paddingVertical: 8,
-    marginTop: 8,
+    marginTop: 4,
   },
   addContactLinkText: {
     color: colors.secondary,
@@ -1115,13 +1030,13 @@ const styles = StyleSheet.create({
   },
   modalButtons: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
+    gap: 10,
+    marginTop: 20,
   },
   modalButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1135,27 +1050,27 @@ const styles = StyleSheet.create({
   },
   modalButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   modalButtonTextSecondary: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   sosIcon: {
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sosModalTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   sosModalText: {
-    fontSize: 16,
+    fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 8,
@@ -1165,9 +1080,9 @@ const styles = StyleSheet.create({
   },
   feedbackIconContainer: {
     alignSelf: 'center',
-    marginBottom: 16,
-    padding: 12,
-    borderRadius: 50,
+    marginBottom: 12,
+    padding: 10,
+    borderRadius: 40,
   },
   feedbackIconError: {
     backgroundColor: '#FEE2E2',
@@ -1179,17 +1094,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#DBEAFE',
   },
   feedbackTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: colors.text,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   feedbackMessage: {
-    fontSize: 15,
+    fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 22,
+    marginBottom: 16,
+    lineHeight: 20,
   },
 });
