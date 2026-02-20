@@ -1,7 +1,8 @@
+
 {
   "expo": {
-    "name": "Safety Tracker",
-    "slug": "safety-tracker",
+    "name": "Trail Tracker",
+    "slug": "trail-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-ohb.png",
@@ -14,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.SafetyTracker",
+      "bundleIdentifier": "com.anonymous.TrailTracker",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "We need your location to track your outdoor activities and send your position to emergency contacts.",
@@ -30,7 +31,7 @@
         "backgroundColor": "#10B981"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.SafetyTracker",
+      "package": "com.anonymous.TrailTracker",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -49,11 +50,11 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Safety Tracker to use your location to track your outdoor activities and send updates to emergency contacts."
+          "locationAlwaysAndWhenInUsePermission": "Allow Trail Tracker to use your location to track your outdoor activities and send updates to emergency contacts."
         }
       ]
     ],
-    "scheme": "safety-tracker",
+    "scheme": "trail-tracker",
     "experiments": {
       "typedRoutes": true
     },
