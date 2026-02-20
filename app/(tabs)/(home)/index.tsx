@@ -20,7 +20,6 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import { authenticatedGet, authenticatedPost, authenticatedPut } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
-import Map from '@/components/Map';
 
 // Helper to resolve image sources (handles both local require() and remote URLs)
 function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
@@ -510,26 +509,6 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={styles.startCard}>
-            {currentLocation && (
-              <View style={styles.mapContainer}>
-                <Map
-                  initialRegion={{
-                    latitude: currentLocation.coords.latitude,
-                    longitude: currentLocation.coords.longitude,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }}
-                  markers={[{
-                    id: 'current',
-                    latitude: currentLocation.coords.latitude,
-                    longitude: currentLocation.coords.longitude,
-                    title: 'Your Location',
-                  }]}
-                  style={styles.map}
-                />
-              </View>
-            )}
-
             <TouchableOpacity
               style={styles.startButton}
               onPress={() => setShowStartModal(true)}
@@ -913,15 +892,6 @@ const styles = StyleSheet.create({
   },
   startCard: {
     alignItems: 'center',
-  },
-  mapContainer: {
-    width: '100%',
-    marginBottom: 16,
-  },
-  map: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
   },
   startButton: {
     backgroundColor: colors.primary,
