@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "Safety Tracker",
+    "slug": "safety-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/app-icon-ohb.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/app-icon-ohb.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#10B981"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.SafetyTracker",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "We need your location to track your outdoor activities and send your position to emergency contacts.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to track your outdoor activities and send periodic updates to your emergency contacts.",
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/app-icon-ohb.png",
+        "backgroundColor": "#10B981"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.SafetyTracker",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/final_quest_240x240.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-router",
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Safety Tracker to use your location to track your outdoor activities and send updates to emergency contacts."
+        }
+      ]
+    ],
+    "scheme": "safety-tracker",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "backendUrl": "https://jwpnv6amsrx68f2kgm7x4m38qnjbmdmk.app.specular.dev"
+    }
+  }
+}
