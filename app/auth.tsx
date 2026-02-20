@@ -168,31 +168,27 @@ export default function AuthScreen() {
             </Text>
           </TouchableOpacity>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or continue with</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => handleSocialAuth("google")}
-            disabled={loading}
-          >
-            <Text style={styles.socialButtonText}>🌐  Continue with Google</Text>
-          </TouchableOpacity>
-
-          {Platform.OS === "ios" && (
+          <View style={styles.socialButtonsContainer}>
             <TouchableOpacity
-              style={[styles.socialButton, styles.appleButton]}
-              onPress={() => handleSocialAuth("apple")}
+              style={styles.socialButton}
+              onPress={() => handleSocialAuth("google")}
               disabled={loading}
             >
-              <Text style={[styles.socialButtonText, styles.appleButtonText]}>
-                🍎  Continue with Apple
-              </Text>
+              <Text style={styles.socialButtonText}>🌐  Continue with Google</Text>
             </TouchableOpacity>
-          )}
+
+            {Platform.OS === "ios" && (
+              <TouchableOpacity
+                style={[styles.socialButton, styles.appleButton]}
+                onPress={() => handleSocialAuth("apple")}
+                disabled={loading}
+              >
+                <Text style={[styles.socialButtonText, styles.appleButtonText]}>
+                  🍎  Continue with Apple
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </ScrollView>
 
@@ -301,20 +297,8 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     fontSize: 14,
   },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  dividerText: {
-    marginHorizontal: 12,
-    color: colors.textSecondary,
-    fontSize: 14,
+  socialButtonsContainer: {
+    marginTop: 24,
   },
   socialButton: {
     height: 50,
