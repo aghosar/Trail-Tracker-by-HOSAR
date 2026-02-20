@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Image,
   ImageSourcePropType,
+  Platform,
 } from 'react-native';
 import { colors } from '@/styles/commonStyles';
 import { Stack } from 'expo-router';
@@ -351,36 +352,59 @@ export default function HomeScreen() {
   };
 
   const sendSMS = async (phoneNumber: string, type: 'start' | 'update' | 'complete' | 'sos', lat: number, lon: number) => {
-    const isAvailable = await SMS.isAvailableAsync();
-    
-    if (!isAvailable) {
-      console.log('HomeScreen: SMS not available on this device');
-      return;
-    }
-    
-    const mapsUrl = `https://maps.google.com/?q=${lat},${lon}`;
-    let message = '';
-    
-    const activityName = activityType.charAt(0).toUpperCase() + activityType.slice(1);
-    const clothingInfo = clothingDescription ? `\nClothing: ${clothingDescription}` : '';
-    const vehicleInfo = vehicleDescription ? `\nVehicle: ${vehicleDescription}` : '';
-    
-    if (type === 'start') {
-      message = `🚨 SAFETY ALERT: I'm starting a ${activityName} trip.\nLocation: ${mapsUrl}${clothingInfo}${vehicleInfo}\nYou'll receive updates every 15 minutes.`;
-    } else if (type === 'update') {
-      message = `📍 Location Update: Still on my ${activityName} trip.\nCurrent location: ${mapsUrl}`;
-    } else if (type === 'complete') {
-      message = `✅ Trip Complete: I've safely finished my ${activityName} trip.\nFinal location: ${mapsUrl}`;
-    } else if (type === 'sos') {
-      message = `🆘 EMERGENCY SOS: I need help!\nActivity: ${activityName}\nLocation: ${mapsUrl}${clothingInfo}${vehicleInfo}\nPlease call emergency services!`;
-    }
-    
-    console.log('HomeScreen: Sending SMS', { type, phoneNumber });
-    
     try {
-      await SMS.sendSMSAsync([phoneNumber], message);
+      const isAvailable = await SMS.isAvailableAsync();
+      
+      if (!isAvailable) {
+        console.log('HomeScreen: SMS not available - device does not support SMS or running on simulator');
+        
+        // Show user-friendly message only on real devices (not simulator)
+        if (Platform.OS !== 'web') {
+          showFeedback(
+            'SMS Unavailable',
+            'SMS messaging is not available on this device. Your trip is still being tracked, but text notifications cannot be sent.',
+            'info'
+          );
+        }
+        return;
+      }
+      
+      const mapsUrl = `https://maps.google.com/?q=${lat},${lon}`;
+      let message = '';
+      
+      const activityName = activityType.charAt(0).toUpperCase() + activityType.slice(1);
+      const clothingInfo = clothingDescription ? `\nClothing: ${clothingDescription}` : '';
+      const vehicleInfo = vehicleDescription ? `\nVehicle: ${vehicleDescription}` : '';
+      
+      if (type === 'start') {
+        message = `🚨 SAFETY ALERT: I'm starting a ${activityName} trip.\nLocation: ${mapsUrl}${clothingInfo}${vehicleInfo}\nYou'll receive updates every 15 minutes.`;
+      } else if (type === 'update') {
+        message = `📍 Location Update: Still on my ${activityName} trip.\nCurrent location: ${mapsUrl}`;
+      } else if (type === 'complete') {
+        message = `✅ Trip Complete: I've safely finished my ${activityName} trip.\nFinal location: ${mapsUrl}`;
+      } else if (type === 'sos') {
+        message = `🆘 EMERGENCY SOS: I need help!\nActivity: ${activityName}\nLocation: ${mapsUrl}${clothingInfo}${vehicleInfo}\nPlease call emergency services!`;
+      }
+      
+      console.log('HomeScreen: Sending SMS', { type, phoneNumber, messageLength: message.length });
+      
+      const result = await SMS.sendSMSAsync([phoneNumber], message);
+      
+      if (result.result === 'sent') {
+        console.log('HomeScreen: SMS sent successfully');
+      } else if (result.result === 'cancelled') {
+        console.log('HomeScreen: SMS cancelled by user');
+        showFeedback('SMS Cancelled', 'The SMS message was not sent because you cancelled it.', 'info');
+      } else {
+        console.log('HomeScreen: SMS result unknown:', result.result);
+      }
     } catch (error) {
       console.error('HomeScreen: Error sending SMS:', error);
+      showFeedback(
+        'SMS Error',
+        'Failed to send SMS notification. Your trip is still being tracked.',
+        'error'
+      );
     }
   };
 
@@ -778,9 +802,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 12,
+    width: 200,
+    height: 200,
+    marginBottom: 16,
   },
   headerTitle: {
     fontSize: 32,
