@@ -68,6 +68,7 @@ export default function HomeScreen() {
   const [showSOSModal, setShowSOSModal] = useState(false);
   const [showActivityDropdown, setShowActivityDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkInLoading, setCheckInLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModal>({
     visible: false,
@@ -339,7 +340,8 @@ export default function HomeScreen() {
       return;
     }
     
-    console.log('HomeScreen: Updating trip location');
+    console.log('HomeScreen: Updating trip location (Check In)');
+    setCheckInLoading(true);
     
     try {
       const location = await Location.getCurrentPositionAsync({
@@ -359,8 +361,12 @@ export default function HomeScreen() {
       await sendSMS(activeTrip.emergencyContact.phoneNumber, 'update', latitude, longitude);
       
       setCurrentLocation(location);
-    } catch (error) {
+      showFeedback('Check In Sent', 'Your updated location has been sent to your emergency contact.', 'success');
+    } catch (error: any) {
       console.error('HomeScreen: Error updating trip location:', error);
+      showFeedback('Check In Failed', error.message || 'Failed to send location update', 'error');
+    } finally {
+      setCheckInLoading(false);
     }
   };
 
@@ -575,6 +581,18 @@ export default function HomeScreen() {
 
             <View style={styles.buttonRow}>
               <TouchableOpacity
+                style={[styles.actionButton, styles.checkInButton]}
+                onPress={updateTripLocation}
+                disabled={checkInLoading}
+              >
+                {checkInLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.actionButtonText}>Check In</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={[styles.actionButton, styles.completeButton]}
                 onPress={completeTrip}
                 disabled={loading}
@@ -585,16 +603,16 @@ export default function HomeScreen() {
                   <Text style={styles.actionButtonText}>Complete</Text>
                 )}
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionButton, styles.sosButton]}
-                onPressIn={handleSOSLongPressIn}
-                onPressOut={handleSOSLongPressOut}
-                disabled={loading}
-              >
-                <Text style={styles.actionButtonText}>Hold SOS</Text>
-              </TouchableOpacity>
             </View>
+
+            <TouchableOpacity
+              style={[styles.actionButton, styles.sosButton, { marginTop: 10 }]}
+              onPressIn={handleSOSLongPressIn}
+              onPressOut={handleSOSLongPressOut}
+              disabled={loading}
+            >
+              <Text style={styles.actionButtonText}>Hold SOS (5s)</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.startCard}>
@@ -972,6 +990,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 10,
+  },
+  checkInButton: {
+    backgroundColor: colors.secondary,
   },
   completeButton: {
     backgroundColor: colors.primary,
