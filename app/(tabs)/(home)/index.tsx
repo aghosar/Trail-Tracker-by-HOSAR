@@ -168,19 +168,83 @@ export default function HomeScreen() {
     }
   };
 
+  const validatePhoneNumber = (phone: string): boolean => {
+    const trimmedPhone = phone.trim();
+    
+    if (trimmedPhone.length === 0) {
+      return false;
+    }
+    
+    const digitsOnly = trimmedPhone.replace(/\D/g, '');
+    
+    if (digitsOnly.length < 10) {
+      return false;
+    }
+    
+    return true;
+  };
+
   const addEmergencyContact = async () => {
-    if (!newContactName.trim() || !newContactPhone.trim()) {
-      showFeedback('Missing Information', 'Please enter both name and phone number', 'error');
+    console.log('HomeScreen: Validating emergency contact input', { 
+      name: newContactName, 
+      phone: newContactPhone 
+    });
+    
+    const trimmedName = newContactName.trim();
+    const trimmedPhone = newContactPhone.trim();
+    
+    if (!trimmedName) {
+      console.log('HomeScreen: Validation failed - name is empty');
+      showFeedback('Missing Name', 'Please enter a contact name', 'error');
       return;
     }
     
-    console.log('HomeScreen: Adding emergency contact', { name: newContactName, phone: newContactPhone });
+    if (trimmedName.length < 2) {
+      console.log('HomeScreen: Validation failed - name too short');
+      showFeedback('Invalid Name', 'Contact name must be at least 2 characters', 'error');
+      return;
+    }
+    
+    if (!trimmedPhone) {
+      console.log('HomeScreen: Validation failed - phone is empty');
+      showFeedback('Missing Phone Number', 'Please enter a phone number', 'error');
+      return;
+    }
+    
+    if (!validatePhoneNumber(trimmedPhone)) {
+      console.log('HomeScreen: Validation failed - invalid phone format');
+      showFeedback(
+        'Invalid Phone Number', 
+        'Please enter a valid phone number with at least 10 digits', 
+        'error'
+      );
+      return;
+    }
+    
+    const duplicateContact = emergencyContacts.find(
+      contact => contact.phoneNumber === trimmedPhone
+    );
+    
+    if (duplicateContact) {
+      console.log('HomeScreen: Validation failed - duplicate phone number');
+      showFeedback(
+        'Duplicate Contact', 
+        `This phone number is already saved for ${duplicateContact.name}`, 
+        'error'
+      );
+      return;
+    }
+    
+    console.log('HomeScreen: Validation passed, adding emergency contact', { 
+      name: trimmedName, 
+      phone: trimmedPhone 
+    });
     setLoading(true);
     
     try {
       const newContact = await authenticatedPost<EmergencyContact>('/api/emergency-contacts', {
-        name: newContactName.trim(),
-        phoneNumber: newContactPhone.trim(),
+        name: trimmedName,
+        phoneNumber: trimmedPhone,
       });
       
       console.log('HomeScreen: Emergency contact added successfully', newContact);
@@ -191,7 +255,26 @@ export default function HomeScreen() {
       showFeedback('Contact Added', `${newContact.name} has been added as an emergency contact.`, 'success');
     } catch (error: any) {
       console.error('HomeScreen: Error adding emergency contact:', error);
-      showFeedback('Error', error.message || 'Failed to add emergency contact', 'error');
+      
+      let errorMessage = 'Failed to add emergency contact';
+      
+      if (error.message) {
+        if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('401') || error.message.includes('unauthorized')) {
+          errorMessage = 'Session expired. Please log in again.';
+        } else if (error.message.includes('400') || error.message.includes('validation')) {
+          errorMessage = 'Invalid contact information. Please check your input.';
+        } else if (error.message.includes('409') || error.message.includes('duplicate')) {
+          errorMessage = 'This contact already exists.';
+        } else if (error.message.includes('500') || error.message.includes('server')) {
+          errorMessage = 'Server error. Please try again later.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      showFeedback('Error Adding Contact', errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -666,16 +749,17 @@ export default function HomeScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Emergency Contact</Text>
 
-            <Text style={styles.inputLabel}>Name</Text>
+            <Text style={styles.inputLabel}>Name *</Text>
             <TextInput
               style={styles.input}
               placeholder="Contact name"
               value={newContactName}
               onChangeText={setNewContactName}
               placeholderTextColor={colors.textSecondary}
+              autoCapitalize="words"
             />
 
-            <Text style={styles.inputLabel}>Phone Number</Text>
+            <Text style={styles.inputLabel}>Phone Number *</Text>
             <TextInput
               style={styles.input}
               placeholder="+1234567890"
@@ -688,7 +772,11 @@ export default function HomeScreen() {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={() => setShowContactModal(false)}
+                onPress={() => {
+                  setShowContactModal(false);
+                  setNewContactName('');
+                  setNewContactPhone('');
+                }}
               >
                 <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
               </TouchableOpacity>
