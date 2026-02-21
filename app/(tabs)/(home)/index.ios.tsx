@@ -18,7 +18,8 @@ import { Stack } from 'expo-router';
 import React, { useState, useEffect, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/IconSymbol';
-import { colors } from '@/styles/commonStyles';
+import { useAuth } from '@/contexts/AuthContext';
+import { authenticatedGet, authenticatedPost, authenticatedPut } from '@/utils/api';
 import * as Location from 'expo-location';
 
 // Helper to resolve image sources (handles both local require() and remote URLs)
@@ -58,6 +59,7 @@ interface FeedbackModal {
 }
 
 export default function HomeScreen() {
+  const { user } = useAuth();
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
@@ -94,13 +96,15 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    console.log('HomeScreen: Initializing without authentication');
+    if (!user) return;
+    console.log('HomeScreen: Initializing for user', user.id);
     const init = async () => {
       await requestLocationPermission();
+      await Promise.all([loadEmergencyContacts(), checkActiveTrip()]);
       setInitialLoading(false);
     };
     init();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (activeTrip) {
@@ -137,7 +141,34 @@ export default function HomeScreen() {
     }
   };
 
+  const loadEmergencyContacts = async () => {
+    console.log('HomeScreen: Loading emergency contacts from API');
+    try {
+      const contacts = await authenticatedGet<EmergencyContact[]>('/api/emergency-contacts');
+      console.log('HomeScreen: Emergency contacts loaded', contacts);
+      setEmergencyContacts(contacts || []);
+    } catch (error) {
+      console.error('HomeScreen: Error loading emergency contacts:', error);
+      setEmergencyContacts([]);
+    }
+  };
 
+  const checkActiveTrip = async () => {
+    console.log('HomeScreen: Checking for active trip from API');
+    try {
+      const trip = await authenticatedGet<ActiveTrip | null>('/api/trips/active');
+      console.log('HomeScreen: Active trip result', trip);
+      if (trip && trip.id) {
+        setActiveTrip(trip);
+        setActivityType(trip.activityType);
+      } else {
+        setActiveTrip(null);
+      }
+    } catch (error) {
+      console.error('HomeScreen: Error checking active trip:', error);
+      setActiveTrip(null);
+    }
+  };
 
   const validatePhoneNumber = (phone: string): boolean => {
     const trimmedPhone = phone.trim();
@@ -206,22 +237,49 @@ export default function HomeScreen() {
       return;
     }
     
-    console.log('HomeScreen: Validation passed, adding emergency contact locally', { 
+    console.log('HomeScreen: Validation passed, adding emergency contact', { 
       name: trimmedName, 
       phone: trimmedPhone 
     });
+    setLoading(true);
     
-    const newContact: EmergencyContact = {
-      id: Date.now().toString(),
-      name: trimmedName,
-      phoneNumber: trimmedPhone,
-    };
-    
-    setEmergencyContacts(prev => [...prev, newContact]);
-    setNewContactName('');
-    setNewContactPhone('');
-    setShowContactModal(false);
-    showFeedback('Contact Added', `${newContact.name} has been added as an emergency contact.`, 'success');
+    try {
+      const newContact = await authenticatedPost<EmergencyContact>('/api/emergency-contacts', {
+        name: trimmedName,
+        phoneNumber: trimmedPhone,
+      });
+      
+      console.log('HomeScreen: Emergency contact added successfully', newContact);
+      setEmergencyContacts(prev => [...prev, newContact]);
+      setNewContactName('');
+      setNewContactPhone('');
+      setShowContactModal(false);
+      showFeedback('Contact Added', `${newContact.name} has been added as an emergency contact.`, 'success');
+    } catch (error: any) {
+      console.error('HomeScreen: Error adding emergency contact:', error);
+      
+      let errorMessage = 'Failed to add emergency contact';
+      
+      if (error.message) {
+        if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('401') || error.message.includes('unauthorized')) {
+          errorMessage = 'Session expired. Please log in again.';
+        } else if (error.message.includes('400') || error.message.includes('validation')) {
+          errorMessage = 'Invalid contact information. Please check your input.';
+        } else if (error.message.includes('409') || error.message.includes('duplicate')) {
+          errorMessage = 'This contact already exists.';
+        } else if (error.message.includes('500') || error.message.includes('server')) {
+          errorMessage = 'Server error. Please try again later.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      showFeedback('Error Adding Contact', errorMessage, 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const startTrip = async () => {
@@ -245,29 +303,22 @@ export default function HomeScreen() {
       return;
     }
     
-    console.log('HomeScreen: Starting trip locally', { activityType, contactId: selectedContactId });
+    console.log('HomeScreen: Starting trip', { activityType, contactId: selectedContactId });
     setLoading(true);
     
     try {
       const { latitude, longitude } = currentLocation.coords;
-      const selectedContact = emergencyContacts.find(c => c.id === selectedContactId);
       
-      if (!selectedContact) {
-        throw new Error('Selected contact not found');
-      }
-      
-      const trip: ActiveTrip = {
-        id: Date.now().toString(),
+      const body: any = {
+        emergencyContactId: selectedContactId,
         activityType,
-        startTime: new Date().toISOString(),
-        status: 'active',
-        lastLatitude: latitude.toString(),
-        lastLongitude: longitude.toString(),
-        emergencyContact: {
-          name: selectedContact.name,
-          phoneNumber: selectedContact.phoneNumber,
-        },
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+        clothingDescription: clothingDescription.trim(),
+        vehicleDescription: vehicleDescription.trim(),
       };
+
+      const trip = await authenticatedPost<ActiveTrip>('/api/trips/start', body);
       
       console.log('HomeScreen: Trip started successfully', trip);
       setActiveTrip(trip);
@@ -314,14 +365,13 @@ export default function HomeScreen() {
       const { latitude, longitude } = location.coords;
       console.log('HomeScreen: Got location for check-in', { latitude, longitude });
       
-      const updatedTrip: ActiveTrip = {
-        ...activeTrip,
-        lastLatitude: latitude.toString(),
-        lastLongitude: longitude.toString(),
-        lastLocationUpdate: new Date().toISOString(),
-      };
+      console.log('HomeScreen: Sending location update to backend', { tripId: activeTrip.id });
+      const updatedTrip = await authenticatedPut<ActiveTrip>(`/api/trips/${activeTrip.id}/location`, {
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+      });
       
-      console.log('HomeScreen: Location updated successfully locally', updatedTrip);
+      console.log('HomeScreen: Location updated successfully on backend', updatedTrip);
       setActiveTrip(updatedTrip);
       
       console.log('HomeScreen: Opening SMS for check-in notification');
@@ -337,6 +387,14 @@ export default function HomeScreen() {
       if (error.message) {
         if (error.message.includes('location') || error.message.includes('Location')) {
           errorMessage = 'Unable to get your current location. Please check your location settings.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('401') || error.message.includes('unauthorized')) {
+          errorMessage = 'Session expired. Please log in again.';
+        } else if (error.message.includes('404')) {
+          errorMessage = 'Trip not found. Please restart your trip.';
+        } else if (error.message.includes('500') || error.message.includes('server')) {
+          errorMessage = 'Server error. Please try again later.';
         } else {
           errorMessage = error.message;
         }
@@ -357,12 +415,15 @@ export default function HomeScreen() {
     setLoading(true);
     
     try {
+      await authenticatedPut(`/api/trips/${activeTrip.id}/complete`, {});
+      
+      console.log('HomeScreen: Trip completed successfully');
+      
       if (currentLocation) {
         const { latitude, longitude } = currentLocation.coords;
         await sendSMS(activeTrip.emergencyContact.phoneNumber, 'complete', latitude, longitude);
       }
       
-      console.log('HomeScreen: Trip completed successfully');
       setActiveTrip(null);
       setElapsedTime(0);
       showFeedback('Trip Complete', 'Your trip has been completed and your emergency contact has been notified.', 'success');
@@ -385,12 +446,10 @@ export default function HomeScreen() {
     try {
       const { latitude, longitude } = currentLocation.coords;
       
-      const updatedTrip: ActiveTrip = {
-        ...activeTrip,
-        status: 'sos',
-        lastLatitude: latitude.toString(),
-        lastLongitude: longitude.toString(),
-      };
+      const updatedTrip = await authenticatedPut<ActiveTrip>(`/api/trips/${activeTrip.id}/sos`, {
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+      });
       
       console.log('HomeScreen: SOS triggered successfully', updatedTrip);
       setActiveTrip(updatedTrip);

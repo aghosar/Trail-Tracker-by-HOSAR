@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Trail Tracker by HOSAR",
-    "slug": "Trail Tracker by HOSAR",
+    "name": "Trail Tracker",
+    "slug": "trail-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-ohb.png",
@@ -53,13 +53,13 @@
         }
       ]
     ],
-    "scheme": "Trail Tracker by HOSAR",
+    "scheme": "trail-tracker",
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "router": {},
-      "backendUrl": "https://db2j3pabam6h9yjnpt5pbeuned25hhb4.app.specular.dev"
+      "backendUrl": "https://jwpnv6amsrx68f2kgm7x4m38qnjbmdmk.app.specular.dev"
     }
   }
 }
