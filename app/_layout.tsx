@@ -1,12 +1,11 @@
-
 import "react-native-reanimated";
 import React, { useEffect } from "react";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { SystemBars } from "react-native-edge-to-edge";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useColorScheme } from "react-native";
+import { useColorScheme, View, ActivityIndicator } from "react-native";
 import { useNetworkState } from "expo-network";
 import {
   DarkTheme,
@@ -16,14 +15,43 @@ import {
 } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import { WidgetProvider } from "@/contexts/WidgetContext";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+// Note: Error logging is auto-initialized via index.ts import
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
-  initialRouteName: "(tabs)",
+  initialRouteName: "(tabs)", // Ensure any route can link back to `/`
 };
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (loading) return;
+
+    const inAuthGroup = segments[0] === "auth" || segments[0] === "auth-popup" || segments[0] === "auth-callback";
+
+    if (!user && !inAuthGroup) {
+      router.replace("/auth");
+    } else if (user && inAuthGroup) {
+      router.replace("/");
+    }
+  }, [user, loading, segments]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#10B981" />
+      </View>
+    );
+  }
+
+  return <>{children}</>;
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -46,24 +74,24 @@ export default function RootLayout() {
     ...DefaultTheme,
     dark: false,
     colors: {
-      primary: "rgb(0, 122, 255)",
-      background: "rgb(242, 242, 247)",
-      card: "rgb(255, 255, 255)",
-      text: "rgb(0, 0, 0)",
-      border: "rgb(216, 216, 220)",
-      notification: "rgb(255, 59, 48)",
+      primary: "rgb(0, 122, 255)", // System Blue
+      background: "rgb(242, 242, 247)", // Light mode background
+      card: "rgb(255, 255, 255)", // White cards/surfaces
+      text: "rgb(0, 0, 0)", // Black text for light mode
+      border: "rgb(216, 216, 220)", // Light gray for separators/borders
+      notification: "rgb(255, 59, 48)", // System Red
     },
   };
 
   const CustomDarkTheme: Theme = {
     ...DarkTheme,
     colors: {
-      primary: "rgb(10, 132, 255)",
-      background: "rgb(1, 1, 1)",
-      card: "rgb(28, 28, 30)",
-      text: "rgb(255, 255, 255)",
-      border: "rgb(44, 44, 46)",
-      notification: "rgb(255, 69, 58)",
+      primary: "rgb(10, 132, 255)", // System Blue (Dark Mode)
+      background: "rgb(1, 1, 1)", // True black background for OLED displays
+      card: "rgb(28, 28, 30)", // Dark card/surface color
+      text: "rgb(255, 255, 255)", // White text for dark mode
+      border: "rgb(44, 44, 46)", // Dark gray for separators/borders
+      notification: "rgb(255, 69, 58)", // System Red (Dark Mode)
     },
   };
 
@@ -76,9 +104,15 @@ export default function RootLayout() {
         <AuthProvider>
           <WidgetProvider>
             <GestureHandlerRootView>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              </Stack>
+              <AuthGate>
+                <Stack>
+                  {/* Main app with tabs */}
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="auth" options={{ headerShown: false }} />
+                  <Stack.Screen name="auth-popup" options={{ headerShown: false }} />
+                  <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
+                </Stack>
+              </AuthGate>
               <SystemBars style={"auto"} />
             </GestureHandlerRootView>
           </WidgetProvider>

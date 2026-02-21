@@ -20,6 +20,12 @@ export default function TabLayout() {
       icon: 'medical-services',
       label: 'First Aid',
     },
+    {
+      name: 'profile',
+      route: '/(tabs)/profile',
+      icon: 'person',
+      label: 'Profile',
+    },
   ];
 
   return (
@@ -32,8 +38,9 @@ export default function TabLayout() {
       >
         <Stack.Screen key="home" name="(home)" />
         <Stack.Screen key="first-aid" name="first-aid" />
+        <Stack.Screen key="profile" name="profile" />
       </Stack>
-      <FloatingTabBar tabs={tabs} containerWidth={screenWidth / 2} />
+      <FloatingTabBar tabs={tabs} containerWidth={screenWidth * 0.75} />
     </>
   );
 }
