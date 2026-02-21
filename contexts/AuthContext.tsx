@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Platform } from "react-native";
 import * as Linking from "expo-linking";
@@ -69,28 +70,18 @@ function openOAuthPopup(provider: string): Promise<string> {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchUser();
+    // Skip authentication check - allow app to work without sign-in
+    setLoading(false);
 
-    // Listen for deep links (e.g. from social auth redirects)
     const subscription = Linking.addEventListener("url", (event) => {
-      console.log("Deep link received, refreshing user session");
-      // Allow time for the client to process the token if needed
-      setTimeout(() => fetchUser(), 500);
+      console.log("Deep link received:", event.url);
     });
-
-    // POLLING: Refresh session every 5 minutes to keep SecureStore token in sync
-    // This prevents 401 errors when the session token rotates
-    const intervalId = setInterval(() => {
-      console.log("Auto-refreshing user session to sync token...");
-      fetchUser();
-    }, 5 * 60 * 1000); // 5 minutes
 
     return () => {
       subscription.remove();
-      clearInterval(intervalId);
     };
   }, []);
 
@@ -100,8 +91,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const session = await authClient.getSession();
       console.log("[Auth] Session data:", JSON.stringify(session?.data ? { user: session.data.user?.email, hasToken: !!session.data.session?.token } : null));
       if (session?.data?.user) {
-        // Sync token to SecureStore BEFORE setting user state
-        // This ensures the token is available when components react to user change
         if (session.data.session?.token) {
           await setBearerToken(session.data.session.token);
           console.log("[Auth] Bearer token stored successfully");
@@ -137,7 +126,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
         name,
-        // Ensure name is passed in header or logic if required, usually passed in body
       });
       await fetchUser();
     } catch (error) {
@@ -153,18 +141,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await setBearerToken(token);
         await fetchUser();
       } else {
-        // Native: Use expo-linking to generate a proper deep link
         const callbackURL = Linking.createURL("/");
         await authClient.signIn.social({
           provider,
           callbackURL,
         });
-        // Note: The redirect will reload the app or be handled by deep linking.
-        // fetchUser will be called on mount or via event listener if needed.
-        // For simple flow, we might need to listen to URL events.
-        // But better-auth expo client handles the redirect and session storage?
-        // We typically need to wait or rely on fetchUser on next app load.
-        // For now, call fetchUser just in case.
         await fetchUser();
       }
     } catch (error) {
@@ -183,7 +164,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Sign out failed (API):", error);
     } finally {
-       // Always clear local state
        setUser(null);
        await clearAuthTokens();
     }
