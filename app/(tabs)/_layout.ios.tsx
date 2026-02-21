@@ -13,10 +13,6 @@ export default function TabLayout() {
         <Label>First Aid</Label>
         <Icon sf={{ default: 'cross.case', selected: 'cross.case.fill' }} drawable="medical-services" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="profile">
-        <Label>Profile</Label>
-        <Icon sf={{ default: 'person', selected: 'person.fill' }} drawable="person" />
-      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
