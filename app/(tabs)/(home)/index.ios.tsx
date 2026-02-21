@@ -1,5 +1,5 @@
 
-import * as SMS from 'expo-sms';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,14 +13,14 @@ import {
   Platform,
   Linking,
 } from 'react-native';
-import { colors } from '@/styles/commonStyles';
-import { Stack } from 'expo-router';
-import React, { useState, useEffect, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { IconSymbol } from '@/components/IconSymbol';
-import { useAuth } from '@/contexts/AuthContext';
-import { authenticatedGet, authenticatedPost, authenticatedPut } from '@/utils/api';
 import * as Location from 'expo-location';
+import * as SMS from 'expo-sms';
+import { IconSymbol } from '@/components/IconSymbol';
+import { colors } from '@/styles/commonStyles';
+import { authenticatedGet, authenticatedPost, authenticatedPut } from '@/utils/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { Stack } from 'expo-router';
 
 // Helper to resolve image sources (handles both local require() and remote URLs)
 function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
@@ -96,8 +96,11 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    if (!user) return;
-    console.log('HomeScreen: Initializing for user', user.id);
+    if (!user) {
+      console.log('[HomeScreen] No user, skipping initialization');
+      return;
+    }
+    console.log('[HomeScreen] Initializing for user', user.id);
     const init = async () => {
       await requestLocationPermission();
       await Promise.all([loadEmergencyContacts(), checkActiveTrip()]);
@@ -120,44 +123,44 @@ export default function HomeScreen() {
 
   const requestLocationPermission = async () => {
     try {
-      console.log('HomeScreen: Requesting foreground location permission');
+      console.log('[HomeScreen] Requesting foreground location permission');
       const { status } = await Location.requestForegroundPermissionsAsync();
       const granted = status === 'granted';
       setHasLocationPermission(granted);
       
       if (granted) {
-        console.log('HomeScreen: Location permission granted, getting current position');
+        console.log('[HomeScreen] Location permission granted, getting current position');
         const location = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
         setCurrentLocation(location);
-        console.log('HomeScreen: Current location obtained', location.coords);
+        console.log('[HomeScreen] Current location obtained', location.coords);
       } else {
-        console.log('HomeScreen: Location permission denied');
+        console.log('[HomeScreen] Location permission denied');
         showFeedback('Permission Required', 'Location permission is required for safety tracking.', 'error');
       }
     } catch (error) {
-      console.error('HomeScreen: Error requesting location permission:', error);
+      console.error('[HomeScreen] Error requesting location permission:', error);
     }
   };
 
   const loadEmergencyContacts = async () => {
-    console.log('HomeScreen: Loading emergency contacts from API');
+    console.log('[HomeScreen] Loading emergency contacts from API');
     try {
       const contacts = await authenticatedGet<EmergencyContact[]>('/api/emergency-contacts');
-      console.log('HomeScreen: Emergency contacts loaded', contacts);
+      console.log('[HomeScreen] Emergency contacts loaded', contacts);
       setEmergencyContacts(contacts || []);
     } catch (error) {
-      console.error('HomeScreen: Error loading emergency contacts:', error);
+      console.error('[HomeScreen] Error loading emergency contacts:', error);
       setEmergencyContacts([]);
     }
   };
 
   const checkActiveTrip = async () => {
-    console.log('HomeScreen: Checking for active trip from API');
+    console.log('[HomeScreen] Checking for active trip from API');
     try {
       const trip = await authenticatedGet<ActiveTrip | null>('/api/trips/active');
-      console.log('HomeScreen: Active trip result', trip);
+      console.log('[HomeScreen] Active trip result', trip);
       if (trip && trip.id) {
         setActiveTrip(trip);
         setActivityType(trip.activityType);
@@ -165,7 +168,7 @@ export default function HomeScreen() {
         setActiveTrip(null);
       }
     } catch (error) {
-      console.error('HomeScreen: Error checking active trip:', error);
+      console.error('[HomeScreen] Error checking active trip:', error);
       setActiveTrip(null);
     }
   };
@@ -187,7 +190,7 @@ export default function HomeScreen() {
   };
 
   const addEmergencyContact = async () => {
-    console.log('HomeScreen: Validating emergency contact input', { 
+    console.log('[HomeScreen] Validating emergency contact input', { 
       name: newContactName, 
       phone: newContactPhone 
     });
@@ -196,25 +199,25 @@ export default function HomeScreen() {
     const trimmedPhone = newContactPhone.trim();
     
     if (!trimmedName) {
-      console.log('HomeScreen: Validation failed - name is empty');
+      console.log('[HomeScreen] Validation failed - name is empty');
       showFeedback('Missing Name', 'Please enter a contact name', 'error');
       return;
     }
     
     if (trimmedName.length < 2) {
-      console.log('HomeScreen: Validation failed - name too short');
+      console.log('[HomeScreen] Validation failed - name too short');
       showFeedback('Invalid Name', 'Contact name must be at least 2 characters', 'error');
       return;
     }
     
     if (!trimmedPhone) {
-      console.log('HomeScreen: Validation failed - phone is empty');
+      console.log('[HomeScreen] Validation failed - phone is empty');
       showFeedback('Missing Phone Number', 'Please enter a phone number', 'error');
       return;
     }
     
     if (!validatePhoneNumber(trimmedPhone)) {
-      console.log('HomeScreen: Validation failed - invalid phone format');
+      console.log('[HomeScreen] Validation failed - invalid phone format');
       showFeedback(
         'Invalid Phone Number', 
         'Please enter a valid phone number with at least 10 digits', 
@@ -228,7 +231,7 @@ export default function HomeScreen() {
     );
     
     if (duplicateContact) {
-      console.log('HomeScreen: Validation failed - duplicate phone number');
+      console.log('[HomeScreen] Validation failed - duplicate phone number');
       showFeedback(
         'Duplicate Contact', 
         `This phone number is already saved for ${duplicateContact.name}`, 
@@ -237,7 +240,7 @@ export default function HomeScreen() {
       return;
     }
     
-    console.log('HomeScreen: Validation passed, adding emergency contact', { 
+    console.log('[HomeScreen] Validation passed, adding emergency contact', { 
       name: trimmedName, 
       phone: trimmedPhone 
     });
@@ -249,14 +252,14 @@ export default function HomeScreen() {
         phoneNumber: trimmedPhone,
       });
       
-      console.log('HomeScreen: Emergency contact added successfully', newContact);
+      console.log('[HomeScreen] Emergency contact added successfully', newContact);
       setEmergencyContacts(prev => [...prev, newContact]);
       setNewContactName('');
       setNewContactPhone('');
       setShowContactModal(false);
       showFeedback('Contact Added', `${newContact.name} has been added as an emergency contact.`, 'success');
     } catch (error: any) {
-      console.error('HomeScreen: Error adding emergency contact:', error);
+      console.error('[HomeScreen] Error adding emergency contact:', error);
       
       let errorMessage = 'Failed to add emergency contact';
       
@@ -303,7 +306,7 @@ export default function HomeScreen() {
       return;
     }
     
-    console.log('HomeScreen: Starting trip', { activityType, contactId: selectedContactId });
+    console.log('[HomeScreen] Starting trip', { activityType, contactId: selectedContactId });
     setLoading(true);
     
     try {
@@ -320,7 +323,7 @@ export default function HomeScreen() {
 
       const trip = await authenticatedPost<ActiveTrip>('/api/trips/start', body);
       
-      console.log('HomeScreen: Trip started successfully', trip);
+      console.log('[HomeScreen] Trip started successfully', trip);
       setActiveTrip(trip);
       
       await sendSMS(trip.emergencyContact.phoneNumber, 'start', latitude, longitude);
@@ -329,7 +332,7 @@ export default function HomeScreen() {
       setClothingDescription('');
       setVehicleDescription('');
     } catch (error: any) {
-      console.error('HomeScreen: Error starting trip:', error);
+      console.error('[HomeScreen] Error starting trip:', error);
       showFeedback('Error', error.message || 'Failed to start trip', 'error');
     } finally {
       setLoading(false);
@@ -338,22 +341,22 @@ export default function HomeScreen() {
 
   const updateTripLocation = async () => {
     if (!activeTrip) {
-      console.log('HomeScreen: Check In aborted - no active trip');
+      console.log('[HomeScreen] Check In aborted - no active trip');
       showFeedback('No Active Trip', 'Please start a trip first', 'error');
       return;
     }
     
     if (!hasLocationPermission) {
-      console.log('HomeScreen: Check In aborted - no location permission');
+      console.log('[HomeScreen] Check In aborted - no location permission');
       showFeedback('Location Permission Required', 'Please grant location permission to check in', 'error');
       return;
     }
     
-    console.log('HomeScreen: Updating trip location (Check In)');
+    console.log('[HomeScreen] Updating trip location (Check In)');
     setCheckInLoading(true);
     
     try {
-      console.log('HomeScreen: Getting current location for check-in');
+      console.log('[HomeScreen] Getting current location for check-in');
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
@@ -363,24 +366,24 @@ export default function HomeScreen() {
       }
       
       const { latitude, longitude } = location.coords;
-      console.log('HomeScreen: Got location for check-in', { latitude, longitude });
+      console.log('[HomeScreen] Got location for check-in', { latitude, longitude });
       
-      console.log('HomeScreen: Sending location update to backend', { tripId: activeTrip.id });
+      console.log('[HomeScreen] Sending location update to backend', { tripId: activeTrip.id });
       const updatedTrip = await authenticatedPut<ActiveTrip>(`/api/trips/${activeTrip.id}/location`, {
         latitude: latitude.toString(),
         longitude: longitude.toString(),
       });
       
-      console.log('HomeScreen: Location updated successfully on backend', updatedTrip);
+      console.log('[HomeScreen] Location updated successfully on backend', updatedTrip);
       setActiveTrip(updatedTrip);
       
-      console.log('HomeScreen: Opening SMS for check-in notification');
+      console.log('[HomeScreen] Opening SMS for check-in notification');
       await sendSMS(activeTrip.emergencyContact.phoneNumber, 'update', latitude, longitude);
       
       setCurrentLocation(location);
       showFeedback('Check In Sent', 'Your updated location has been sent to your emergency contact.', 'success');
     } catch (error: any) {
-      console.error('HomeScreen: Error updating trip location:', error);
+      console.error('[HomeScreen] Error updating trip location:', error);
       
       let errorMessage = 'Failed to send location update';
       
@@ -411,13 +414,13 @@ export default function HomeScreen() {
       return;
     }
     
-    console.log('HomeScreen: Completing trip', activeTrip.id);
+    console.log('[HomeScreen] Completing trip', activeTrip.id);
     setLoading(true);
     
     try {
       await authenticatedPut(`/api/trips/${activeTrip.id}/complete`, {});
       
-      console.log('HomeScreen: Trip completed successfully');
+      console.log('[HomeScreen] Trip completed successfully');
       
       if (currentLocation) {
         const { latitude, longitude } = currentLocation.coords;
@@ -428,7 +431,7 @@ export default function HomeScreen() {
       setElapsedTime(0);
       showFeedback('Trip Complete', 'Your trip has been completed and your emergency contact has been notified.', 'success');
     } catch (error: any) {
-      console.error('HomeScreen: Error completing trip:', error);
+      console.error('[HomeScreen] Error completing trip:', error);
       showFeedback('Error', error.message || 'Failed to complete trip', 'error');
     } finally {
       setLoading(false);
@@ -440,7 +443,7 @@ export default function HomeScreen() {
       return;
     }
     
-    console.log('HomeScreen: Triggering SOS');
+    console.log('[HomeScreen] Triggering SOS');
     setLoading(true);
     
     try {
@@ -451,7 +454,7 @@ export default function HomeScreen() {
         longitude: longitude.toString(),
       });
       
-      console.log('HomeScreen: SOS triggered successfully', updatedTrip);
+      console.log('[HomeScreen] SOS triggered successfully', updatedTrip);
       setActiveTrip(updatedTrip);
       
       await sendSMS(activeTrip.emergencyContact.phoneNumber, 'sos', latitude, longitude);
@@ -459,7 +462,7 @@ export default function HomeScreen() {
       setShowSOSModal(false);
       showFeedback('SOS Sent', 'Emergency message has been sent to your contact. Help is on the way!', 'error');
     } catch (error: any) {
-      console.error('HomeScreen: Error triggering SOS:', error);
+      console.error('[HomeScreen] Error triggering SOS:', error);
       showFeedback('Error', error.message || 'Failed to send SOS', 'error');
     } finally {
       setLoading(false);
@@ -485,17 +488,21 @@ export default function HomeScreen() {
         message = `🆘 EMERGENCY SOS: I need help!\nActivity: ${activityName}\nLocation: ${mapsUrl}${clothingInfo}${vehicleInfo}\nPlease call emergency services!`;
       }
       
-      console.log('HomeScreen: Opening SMS app', { type, phoneNumber, messageLength: message.length });
+      console.log('[HomeScreen] Opening SMS app', { type, phoneNumber, messageLength: message.length });
       
-      const smsUrl = `sms:${phoneNumber}&body=${encodeURIComponent(message)}`;
+      const smsUrl = Platform.select({
+        ios: `sms:${phoneNumber}&body=${encodeURIComponent(message)}`,
+        android: `sms:${phoneNumber}?body=${encodeURIComponent(message)}`,
+        default: `sms:${phoneNumber}?body=${encodeURIComponent(message)}`,
+      });
       
       const canOpen = await Linking.canOpenURL(smsUrl);
       
       if (canOpen) {
         await Linking.openURL(smsUrl);
-        console.log('HomeScreen: SMS app opened successfully');
+        console.log('[HomeScreen] SMS app opened successfully');
       } else {
-        console.log('HomeScreen: Cannot open SMS URL');
+        console.log('[HomeScreen] Cannot open SMS URL');
         showFeedback(
           'SMS Unavailable',
           'Unable to open SMS app. Please send the message manually.',
@@ -503,7 +510,7 @@ export default function HomeScreen() {
         );
       }
     } catch (error) {
-      console.error('HomeScreen: Error opening SMS:', error);
+      console.error('[HomeScreen] Error opening SMS:', error);
       showFeedback(
         'SMS Error',
         'Failed to open SMS app. Your trip is still being tracked.',
@@ -525,34 +532,34 @@ export default function HomeScreen() {
   };
 
   const handleSOSLongPressIn = () => {
-    console.log('HomeScreen: SOS long press started');
+    console.log('[HomeScreen] SOS long press started');
     sosLongPressTimer.current = setTimeout(() => {
       setShowSOSModal(true);
     }, 5000);
   };
 
   const handleSOSLongPressOut = () => {
-    console.log('HomeScreen: SOS long press cancelled');
+    console.log('[HomeScreen] SOS long press cancelled');
     if (sosLongPressTimer.current) {
       clearTimeout(sosLongPressTimer.current);
     }
   };
 
   const handleDonatePress = async () => {
-    console.log('HomeScreen: Opening HOSAR donation page');
+    console.log('[HomeScreen] Opening HOSAR donation page');
     const hosarUrl = 'https://hosar.org/#';
     
     try {
       const canOpen = await Linking.canOpenURL(hosarUrl);
       if (canOpen) {
         await Linking.openURL(hosarUrl);
-        console.log('HomeScreen: HOSAR donation page opened successfully');
+        console.log('[HomeScreen] HOSAR donation page opened successfully');
       } else {
-        console.log('HomeScreen: Cannot open HOSAR URL');
+        console.log('[HomeScreen] Cannot open HOSAR URL');
         showFeedback('Error', 'Unable to open donation page', 'error');
       }
     } catch (error) {
-      console.error('HomeScreen: Error opening HOSAR donation page:', error);
+      console.error('[HomeScreen] Error opening HOSAR donation page:', error);
       showFeedback('Error', 'Unable to open donation page', 'error');
     }
   };
@@ -930,6 +937,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+    paddingTop: Platform.OS === 'android' ? 48 : 16,
   },
   header: {
     alignItems: 'center',

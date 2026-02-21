@@ -1,10 +1,12 @@
+
 import { createAuthClient } from "better-auth/react";
 import { expoClient } from "@better-auth/expo/client";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
-const API_URL = "https://jwpnv6amsrx68f2kgm7x4m38qnjbmdmk.app.specular.dev";
+// Use the backend URL from app.json configuration
+const API_URL = Constants.expoConfig?.extra?.backendUrl || "";
 
 export const BEARER_TOKEN_KEY = "safety-tracker_bearer_token";
 
@@ -21,8 +23,8 @@ export const authClient = createAuthClient({
   baseURL: API_URL,
   plugins: [
     expoClient({
-      scheme: "safety-tracker",
-      storagePrefix: "safety-tracker",
+      scheme: "trail-tracker",
+      storagePrefix: "trail-tracker",
       storage,
     }),
   ],
