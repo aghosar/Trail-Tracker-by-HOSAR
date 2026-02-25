@@ -86,6 +86,7 @@ export default function HomeScreen() {
   const sosLongPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   const showFeedback = (title: string, message: string, type: 'error' | 'success' | 'info' = 'info') => {
+    console.log('[HomeScreen] Showing feedback:', { title, message, type });
     setFeedbackModal({ visible: true, title, message, type });
   };
 
@@ -219,27 +220,40 @@ export default function HomeScreen() {
   };
 
   const startTrip = async () => {
+    console.log('[HomeScreen] Start Trip button pressed');
+    console.log('[HomeScreen] Current state:', {
+      selectedContactId,
+      clothingDescription,
+      vehicleDescription,
+      hasLocation: !!currentLocation,
+      emergencyContactsCount: emergencyContacts.length
+    });
+
     if (!selectedContactId) {
+      console.log('[HomeScreen] Validation failed - no contact selected');
       showFeedback('No Contact Selected', 'Please select an emergency contact', 'error');
       return;
     }
     
     if (!clothingDescription.trim()) {
+      console.log('[HomeScreen] Validation failed - no clothing description');
       showFeedback('Missing Information', 'Clothing description is required', 'error');
       return;
     }
     
     if (!vehicleDescription.trim()) {
+      console.log('[HomeScreen] Validation failed - no vehicle description');
       showFeedback('Missing Information', 'Vehicle description is required', 'error');
       return;
     }
     
     if (!currentLocation) {
+      console.log('[HomeScreen] Validation failed - no current location');
       showFeedback('Location Unavailable', 'Unable to get current location. Please try again.', 'error');
       return;
     }
     
-    console.log('[HomeScreen] Starting trip locally', { activityType, contactId: selectedContactId });
+    console.log('[HomeScreen] All validations passed, starting trip');
     setLoading(true);
     
     try {
@@ -265,14 +279,19 @@ export default function HomeScreen() {
         vehicleDescription: vehicleDescription.trim(),
       };
       
-      console.log('[HomeScreen] Trip started successfully', newTrip);
+      console.log('[HomeScreen] Trip created successfully', newTrip);
       setActiveTrip(newTrip);
       
+      console.log('[HomeScreen] Sending initial SMS');
       await sendSMS(selectedContact.phoneNumber, 'start', latitude, longitude);
       
+      console.log('[HomeScreen] Closing modal and resetting form');
       setShowStartModal(false);
       setClothingDescription('');
       setVehicleDescription('');
+      setSelectedContactId('');
+      
+      showFeedback('Trip Started', 'Your trip has been started and your emergency contact has been notified.', 'success');
     } catch (error: any) {
       console.error('[HomeScreen] Error starting trip:', error);
       showFeedback('Error', error.message || 'Failed to start trip', 'error');
@@ -594,7 +613,10 @@ export default function HomeScreen() {
             <View style={styles.startCard}>
               <TouchableOpacity
                 style={styles.startButton}
-                onPress={() => setShowStartModal(true)}
+                onPress={() => {
+                  console.log('[HomeScreen] Start Trip button tapped, opening modal');
+                  setShowStartModal(true);
+                }}
                 disabled={!hasLocationPermission}
               >
                 <Text style={styles.startButtonText}>Start Trip</Text>
@@ -619,7 +641,7 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Modals - Same as index.tsx */}
+        {/* Start Trip Modal */}
         <Modal visible={showStartModal} animationType="slide" transparent>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -646,6 +668,7 @@ export default function HomeScreen() {
                       key={activity.value}
                       style={styles.dropdownItem}
                       onPress={() => {
+                        console.log('[HomeScreen] Activity selected:', activity.value);
                         setActivityType(activity.value);
                         setShowActivityDropdown(false);
                       }}
@@ -672,7 +695,10 @@ export default function HomeScreen() {
                     <TouchableOpacity
                       key={contact.id}
                       style={[styles.contactOption, isSelected && styles.contactOptionSelected]}
-                      onPress={() => setSelectedContactId(contact.id)}
+                      onPress={() => {
+                        console.log('[HomeScreen] Contact selected:', contact.id, contact.name);
+                        setSelectedContactId(contact.id);
+                      }}
                     >
                       <View style={styles.contactInfo}>
                         <Text style={[styles.contactNameText, isSelected && styles.contactNameSelected]}>{contact.name}</Text>
@@ -701,7 +727,10 @@ export default function HomeScreen() {
                 style={styles.input}
                 placeholder="e.g., Red jacket, blue jeans"
                 value={clothingDescription}
-                onChangeText={setClothingDescription}
+                onChangeText={(text) => {
+                  console.log('[HomeScreen] Clothing description changed:', text);
+                  setClothingDescription(text);
+                }}
                 placeholderTextColor={colors.textSecondary}
               />
 
@@ -710,20 +739,29 @@ export default function HomeScreen() {
                 style={styles.input}
                 placeholder="e.g., White Toyota 4Runner, ABC123"
                 value={vehicleDescription}
-                onChangeText={setVehicleDescription}
+                onChangeText={(text) => {
+                  console.log('[HomeScreen] Vehicle description changed:', text);
+                  setVehicleDescription(text);
+                }}
                 placeholderTextColor={colors.textSecondary}
               />
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.modalButtonSecondary]}
-                  onPress={() => setShowStartModal(false)}
+                  onPress={() => {
+                    console.log('[HomeScreen] Start Trip modal cancelled');
+                    setShowStartModal(false);
+                  }}
                 >
                   <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.modalButtonPrimary]}
-                  onPress={startTrip}
+                  onPress={() => {
+                    console.log('[HomeScreen] Start button in modal pressed');
+                    startTrip();
+                  }}
                   disabled={loading}
                 >
                   {loading ? (
@@ -737,6 +775,7 @@ export default function HomeScreen() {
           </View>
         </Modal>
 
+        {/* Add Contact Modal */}
         <Modal visible={showContactModal} animationType="slide" transparent>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -789,6 +828,7 @@ export default function HomeScreen() {
           </View>
         </Modal>
 
+        {/* SOS Confirmation Modal */}
         <Modal visible={showSOSModal} animationType="fade" transparent>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -821,6 +861,7 @@ export default function HomeScreen() {
           </View>
         </Modal>
 
+        {/* Feedback Modal */}
         <Modal visible={feedbackModal.visible} animationType="fade" transparent>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>

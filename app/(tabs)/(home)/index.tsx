@@ -85,11 +85,12 @@ export default function HomeScreen() {
   const sosLongPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   const showFeedback = (title: string, message: string, type: 'error' | 'success' | 'info' = 'info') => {
+    console.log('[HomeScreen] Showing feedback:', { title, message, type });
     setFeedbackModal({ visible: true, title, message, type });
   };
 
   useEffect(() => {
-    console.log('HomeScreen: Initializing app without authentication');
+    console.log('[HomeScreen] Initializing app without authentication');
     const init = async () => {
       await requestLocationPermission();
       setInitialLoading(false);
@@ -111,24 +112,24 @@ export default function HomeScreen() {
 
   const requestLocationPermission = async () => {
     try {
-      console.log('HomeScreen: Requesting foreground location permission');
+      console.log('[HomeScreen] Requesting foreground location permission');
       const { status } = await Location.requestForegroundPermissionsAsync();
       const granted = status === 'granted';
       setHasLocationPermission(granted);
       
       if (granted) {
-        console.log('HomeScreen: Location permission granted, getting current position');
+        console.log('[HomeScreen] Location permission granted, getting current position');
         const location = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
         setCurrentLocation(location);
-        console.log('HomeScreen: Current location obtained', location.coords);
+        console.log('[HomeScreen] Current location obtained', location.coords);
       } else {
-        console.log('HomeScreen: Location permission denied');
+        console.log('[HomeScreen] Location permission denied');
         showFeedback('Permission Required', 'Location permission is required for safety tracking.', 'error');
       }
     } catch (error) {
-      console.error('HomeScreen: Error requesting location permission:', error);
+      console.error('[HomeScreen] Error requesting location permission:', error);
     }
   };
 
@@ -149,7 +150,7 @@ export default function HomeScreen() {
   };
 
   const addEmergencyContact = () => {
-    console.log('HomeScreen: Validating emergency contact input', { 
+    console.log('[HomeScreen] Validating emergency contact input', { 
       name: newContactName, 
       phone: newContactPhone 
     });
@@ -158,25 +159,25 @@ export default function HomeScreen() {
     const trimmedPhone = newContactPhone.trim();
     
     if (!trimmedName) {
-      console.log('HomeScreen: Validation failed - name is empty');
+      console.log('[HomeScreen] Validation failed - name is empty');
       showFeedback('Missing Name', 'Please enter a contact name', 'error');
       return;
     }
     
     if (trimmedName.length < 2) {
-      console.log('HomeScreen: Validation failed - name too short');
+      console.log('[HomeScreen] Validation failed - name too short');
       showFeedback('Invalid Name', 'Contact name must be at least 2 characters', 'error');
       return;
     }
     
     if (!trimmedPhone) {
-      console.log('HomeScreen: Validation failed - phone is empty');
+      console.log('[HomeScreen] Validation failed - phone is empty');
       showFeedback('Missing Phone Number', 'Please enter a phone number', 'error');
       return;
     }
     
     if (!validatePhoneNumber(trimmedPhone)) {
-      console.log('HomeScreen: Validation failed - invalid phone format');
+      console.log('[HomeScreen] Validation failed - invalid phone format');
       showFeedback(
         'Invalid Phone Number', 
         'Please enter a valid phone number with at least 10 digits', 
@@ -190,7 +191,7 @@ export default function HomeScreen() {
     );
     
     if (duplicateContact) {
-      console.log('HomeScreen: Validation failed - duplicate phone number');
+      console.log('[HomeScreen] Validation failed - duplicate phone number');
       showFeedback(
         'Duplicate Contact', 
         `This phone number is already saved for ${duplicateContact.name}`, 
@@ -199,7 +200,7 @@ export default function HomeScreen() {
       return;
     }
     
-    console.log('HomeScreen: Adding emergency contact locally', { 
+    console.log('[HomeScreen] Adding emergency contact locally', { 
       name: trimmedName, 
       phone: trimmedPhone 
     });
@@ -218,27 +219,40 @@ export default function HomeScreen() {
   };
 
   const startTrip = async () => {
+    console.log('[HomeScreen] Start Trip button pressed');
+    console.log('[HomeScreen] Current state:', {
+      selectedContactId,
+      clothingDescription,
+      vehicleDescription,
+      hasLocation: !!currentLocation,
+      emergencyContactsCount: emergencyContacts.length
+    });
+
     if (!selectedContactId) {
+      console.log('[HomeScreen] Validation failed - no contact selected');
       showFeedback('No Contact Selected', 'Please select an emergency contact', 'error');
       return;
     }
     
     if (!clothingDescription.trim()) {
+      console.log('[HomeScreen] Validation failed - no clothing description');
       showFeedback('Missing Information', 'Clothing description is required', 'error');
       return;
     }
     
     if (!vehicleDescription.trim()) {
+      console.log('[HomeScreen] Validation failed - no vehicle description');
       showFeedback('Missing Information', 'Vehicle description is required', 'error');
       return;
     }
     
     if (!currentLocation) {
+      console.log('[HomeScreen] Validation failed - no current location');
       showFeedback('Location Unavailable', 'Unable to get current location. Please try again.', 'error');
       return;
     }
     
-    console.log('HomeScreen: Starting trip locally', { activityType, contactId: selectedContactId });
+    console.log('[HomeScreen] All validations passed, starting trip');
     setLoading(true);
     
     try {
@@ -264,16 +278,21 @@ export default function HomeScreen() {
         vehicleDescription: vehicleDescription.trim(),
       };
       
-      console.log('HomeScreen: Trip started successfully', newTrip);
+      console.log('[HomeScreen] Trip created successfully', newTrip);
       setActiveTrip(newTrip);
       
+      console.log('[HomeScreen] Sending initial SMS');
       await sendSMS(selectedContact.phoneNumber, 'start', latitude, longitude);
       
+      console.log('[HomeScreen] Closing modal and resetting form');
       setShowStartModal(false);
       setClothingDescription('');
       setVehicleDescription('');
+      setSelectedContactId('');
+      
+      showFeedback('Trip Started', 'Your trip has been started and your emergency contact has been notified.', 'success');
     } catch (error: any) {
-      console.error('HomeScreen: Error starting trip:', error);
+      console.error('[HomeScreen] Error starting trip:', error);
       showFeedback('Error', error.message || 'Failed to start trip', 'error');
     } finally {
       setLoading(false);
@@ -282,22 +301,22 @@ export default function HomeScreen() {
 
   const updateTripLocation = async () => {
     if (!activeTrip) {
-      console.log('HomeScreen: Check In aborted - no active trip');
+      console.log('[HomeScreen] Check In aborted - no active trip');
       showFeedback('No Active Trip', 'Please start a trip first', 'error');
       return;
     }
     
     if (!hasLocationPermission) {
-      console.log('HomeScreen: Check In aborted - no location permission');
+      console.log('[HomeScreen] Check In aborted - no location permission');
       showFeedback('Location Permission Required', 'Please grant location permission to check in', 'error');
       return;
     }
     
-    console.log('HomeScreen: Updating trip location (Check In)');
+    console.log('[HomeScreen] Updating trip location (Check In)');
     setCheckInLoading(true);
     
     try {
-      console.log('HomeScreen: Getting current location for check-in');
+      console.log('[HomeScreen] Getting current location for check-in');
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
@@ -307,7 +326,7 @@ export default function HomeScreen() {
       }
       
       const { latitude, longitude } = location.coords;
-      console.log('HomeScreen: Got location for check-in', { latitude, longitude });
+      console.log('[HomeScreen] Got location for check-in', { latitude, longitude });
       
       const updatedTrip: ActiveTrip = {
         ...activeTrip,
@@ -317,13 +336,13 @@ export default function HomeScreen() {
       
       setActiveTrip(updatedTrip);
       
-      console.log('HomeScreen: Opening SMS for check-in notification');
+      console.log('[HomeScreen] Opening SMS for check-in notification');
       await sendSMS(activeTrip.emergencyContact.phoneNumber, 'update', latitude, longitude);
       
       setCurrentLocation(location);
       showFeedback('Check In Sent', 'Your updated location has been sent to your emergency contact.', 'success');
     } catch (error: any) {
-      console.error('HomeScreen: Error updating trip location:', error);
+      console.error('[HomeScreen] Error updating trip location:', error);
       
       let errorMessage = 'Failed to send location update';
       
@@ -346,7 +365,7 @@ export default function HomeScreen() {
       return;
     }
     
-    console.log('HomeScreen: Completing trip', activeTrip.id);
+    console.log('[HomeScreen] Completing trip', activeTrip.id);
     setLoading(true);
     
     try {
@@ -355,12 +374,12 @@ export default function HomeScreen() {
         await sendSMS(activeTrip.emergencyContact.phoneNumber, 'complete', latitude, longitude);
       }
       
-      console.log('HomeScreen: Trip completed successfully');
+      console.log('[HomeScreen] Trip completed successfully');
       setActiveTrip(null);
       setElapsedTime(0);
       showFeedback('Trip Complete', 'Your trip has been completed and your emergency contact has been notified.', 'success');
     } catch (error: any) {
-      console.error('HomeScreen: Error completing trip:', error);
+      console.error('[HomeScreen] Error completing trip:', error);
       showFeedback('Error', error.message || 'Failed to complete trip', 'error');
     } finally {
       setLoading(false);
@@ -372,7 +391,7 @@ export default function HomeScreen() {
       return;
     }
     
-    console.log('HomeScreen: Triggering SOS');
+    console.log('[HomeScreen] Triggering SOS');
     setLoading(true);
     
     try {
@@ -385,7 +404,7 @@ export default function HomeScreen() {
         lastLongitude: longitude,
       };
       
-      console.log('HomeScreen: SOS triggered successfully', updatedTrip);
+      console.log('[HomeScreen] SOS triggered successfully', updatedTrip);
       setActiveTrip(updatedTrip);
       
       await sendSMS(activeTrip.emergencyContact.phoneNumber, 'sos', latitude, longitude);
@@ -393,7 +412,7 @@ export default function HomeScreen() {
       setShowSOSModal(false);
       showFeedback('SOS Sent', 'Emergency message has been sent to your contact. Help is on the way!', 'error');
     } catch (error: any) {
-      console.error('HomeScreen: Error triggering SOS:', error);
+      console.error('[HomeScreen] Error triggering SOS:', error);
       showFeedback('Error', error.message || 'Failed to send SOS', 'error');
     } finally {
       setLoading(false);
@@ -419,7 +438,7 @@ export default function HomeScreen() {
         message = `🆘 EMERGENCY SOS: I need help!\nActivity: ${activityName}\nLocation: ${mapsUrl}${clothingInfo}${vehicleInfo}\nPlease call emergency services!`;
       }
       
-      console.log('HomeScreen: Opening SMS app', { type, phoneNumber, messageLength: message.length });
+      console.log('[HomeScreen] Opening SMS app', { type, phoneNumber, messageLength: message.length });
       
       const smsUrl = Platform.select({
         ios: `sms:${phoneNumber}&body=${encodeURIComponent(message)}`,
@@ -431,9 +450,9 @@ export default function HomeScreen() {
       
       if (canOpen) {
         await Linking.openURL(smsUrl);
-        console.log('HomeScreen: SMS app opened successfully');
+        console.log('[HomeScreen] SMS app opened successfully');
       } else {
-        console.log('HomeScreen: Cannot open SMS URL');
+        console.log('[HomeScreen] Cannot open SMS URL');
         showFeedback(
           'SMS Unavailable',
           'Unable to open SMS app. Please send the message manually.',
@@ -441,7 +460,7 @@ export default function HomeScreen() {
         );
       }
     } catch (error) {
-      console.error('HomeScreen: Error opening SMS:', error);
+      console.error('[HomeScreen] Error opening SMS:', error);
       showFeedback(
         'SMS Error',
         'Failed to open SMS app. Your trip is still being tracked.',
@@ -463,34 +482,34 @@ export default function HomeScreen() {
   };
 
   const handleSOSLongPressIn = () => {
-    console.log('HomeScreen: SOS long press started');
+    console.log('[HomeScreen] SOS long press started');
     sosLongPressTimer.current = setTimeout(() => {
       setShowSOSModal(true);
     }, 5000);
   };
 
   const handleSOSLongPressOut = () => {
-    console.log('HomeScreen: SOS long press cancelled');
+    console.log('[HomeScreen] SOS long press cancelled');
     if (sosLongPressTimer.current) {
       clearTimeout(sosLongPressTimer.current);
     }
   };
 
   const handleDonatePress = async () => {
-    console.log('HomeScreen: Opening HOSAR donation page');
+    console.log('[HomeScreen] Opening HOSAR donation page');
     const hosarUrl = 'https://hosar.org/#';
     
     try {
       const canOpen = await Linking.canOpenURL(hosarUrl);
       if (canOpen) {
         await Linking.openURL(hosarUrl);
-        console.log('HomeScreen: HOSAR donation page opened successfully');
+        console.log('[HomeScreen] HOSAR donation page opened successfully');
       } else {
-        console.log('HomeScreen: Cannot open HOSAR URL');
+        console.log('[HomeScreen] Cannot open HOSAR URL');
         showFeedback('Error', 'Unable to open donation page', 'error');
       }
     } catch (error) {
-      console.error('HomeScreen: Error opening HOSAR donation page:', error);
+      console.error('[HomeScreen] Error opening HOSAR donation page:', error);
       showFeedback('Error', 'Unable to open donation page', 'error');
     }
   };
@@ -588,7 +607,10 @@ export default function HomeScreen() {
           <View style={styles.startCard}>
             <TouchableOpacity
               style={styles.startButton}
-              onPress={() => setShowStartModal(true)}
+              onPress={() => {
+                console.log('[HomeScreen] Start Trip button tapped, opening modal');
+                setShowStartModal(true);
+              }}
               disabled={!hasLocationPermission}
             >
               <Text style={styles.startButtonText}>Start Trip</Text>
@@ -640,6 +662,7 @@ export default function HomeScreen() {
                     key={activity.value}
                     style={styles.dropdownItem}
                     onPress={() => {
+                      console.log('[HomeScreen] Activity selected:', activity.value);
                       setActivityType(activity.value);
                       setShowActivityDropdown(false);
                     }}
@@ -666,7 +689,10 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     key={contact.id}
                     style={[styles.contactOption, isSelected && styles.contactOptionSelected]}
-                    onPress={() => setSelectedContactId(contact.id)}
+                    onPress={() => {
+                      console.log('[HomeScreen] Contact selected:', contact.id, contact.name);
+                      setSelectedContactId(contact.id);
+                    }}
                   >
                     <View style={styles.contactInfo}>
                       <Text style={[styles.contactNameText, isSelected && styles.contactNameSelected]}>{contact.name}</Text>
@@ -695,7 +721,10 @@ export default function HomeScreen() {
               style={styles.input}
               placeholder="e.g., Red jacket, blue jeans"
               value={clothingDescription}
-              onChangeText={setClothingDescription}
+              onChangeText={(text) => {
+                console.log('[HomeScreen] Clothing description changed:', text);
+                setClothingDescription(text);
+              }}
               placeholderTextColor={colors.textSecondary}
             />
 
@@ -704,20 +733,29 @@ export default function HomeScreen() {
               style={styles.input}
               placeholder="e.g., White Toyota 4Runner, ABC123"
               value={vehicleDescription}
-              onChangeText={setVehicleDescription}
+              onChangeText={(text) => {
+                console.log('[HomeScreen] Vehicle description changed:', text);
+                setVehicleDescription(text);
+              }}
               placeholderTextColor={colors.textSecondary}
             />
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={() => setShowStartModal(false)}
+                onPress={() => {
+                  console.log('[HomeScreen] Start Trip modal cancelled');
+                  setShowStartModal(false);
+                }}
               >
                 <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={startTrip}
+                onPress={() => {
+                  console.log('[HomeScreen] Start button in modal pressed');
+                  startTrip();
+                }}
                 disabled={loading}
               >
                 {loading ? (
