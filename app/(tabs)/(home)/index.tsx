@@ -82,7 +82,10 @@ export default function HomeScreen() {
   const [newContactName, setNewContactName] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
   
-  const sosLongPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const [sosHoldProgress, setSosHoldProgress] = useState(0);
+  const [sosHolding, setSosHolding] = useState(false);
+  const sosIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const sosTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const showFeedback = (title: string, message: string, type: 'error' | 'success' | 'info' = 'info') => {
     console.log('[HomeScreen] Showing feedback:', { title, message, type });
@@ -481,18 +484,47 @@ export default function HomeScreen() {
     return `${hoursStr}:${minutesStr}:${secsStr}`;
   };
 
-  const handleSOSLongPressIn = () => {
-    console.log('[HomeScreen] SOS long press started');
-    sosLongPressTimer.current = setTimeout(() => {
+  const handleSOSPressIn = () => {
+    console.log('[HomeScreen] SOS button press started');
+    setSosHolding(true);
+    setSosHoldProgress(0);
+    
+    const startTime = Date.now();
+    const duration = 5000;
+    
+    sosIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min((elapsed / duration) * 100, 100);
+      setSosHoldProgress(progress);
+    }, 50);
+    
+    sosTimeoutRef.current = setTimeout(() => {
+      console.log('[HomeScreen] SOS 5-second hold completed, showing confirmation modal');
+      if (sosIntervalRef.current) {
+        clearInterval(sosIntervalRef.current);
+        sosIntervalRef.current = null;
+      }
+      setSosHolding(false);
+      setSosHoldProgress(0);
       setShowSOSModal(true);
-    }, 5000);
+    }, duration);
   };
 
-  const handleSOSLongPressOut = () => {
-    console.log('[HomeScreen] SOS long press cancelled');
-    if (sosLongPressTimer.current) {
-      clearTimeout(sosLongPressTimer.current);
+  const handleSOSPressOut = () => {
+    console.log('[HomeScreen] SOS button press released');
+    
+    if (sosIntervalRef.current) {
+      clearInterval(sosIntervalRef.current);
+      sosIntervalRef.current = null;
     }
+    
+    if (sosTimeoutRef.current) {
+      clearTimeout(sosTimeoutRef.current);
+      sosTimeoutRef.current = null;
+    }
+    
+    setSosHolding(false);
+    setSosHoldProgress(0);
   };
 
   const handleDonatePress = async () => {
@@ -522,6 +554,8 @@ export default function HomeScreen() {
   ];
 
   const selectedActivityLabel = activityTypes.find(a => a.value === activityType)?.label || 'Select Activity';
+  const sosProgressPercent = `${Math.round(sosHoldProgress)}%`;
+  const sosRemainingSeconds = Math.ceil((100 - sosHoldProgress) / 20);
 
   if (initialLoading) {
     return (
@@ -595,12 +629,18 @@ export default function HomeScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.actionButton, styles.sosButton, { marginTop: 10 }]}
-              onPressIn={handleSOSLongPressIn}
-              onPressOut={handleSOSLongPressOut}
+              style={[styles.actionButton, styles.sosButton, { marginTop: 10, overflow: 'hidden' }]}
+              onPressIn={handleSOSPressIn}
+              onPressOut={handleSOSPressOut}
               disabled={loading}
+              activeOpacity={0.8}
             >
-              <Text style={styles.actionButtonText}>Hold SOS (5s)</Text>
+              {sosHolding && (
+                <View style={[styles.sosProgressBar, { width: sosProgressPercent }]} />
+              )}
+              <Text style={styles.actionButtonText}>
+                {sosHolding ? `Hold SOS (${sosRemainingSeconds}s)` : 'Hold SOS (5s)'}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -998,6 +1038,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 10,
+    position: 'relative',
   },
   checkInButton: {
     backgroundColor: colors.secondary,
@@ -1008,10 +1049,19 @@ const styles = StyleSheet.create({
   sosButton: {
     backgroundColor: colors.danger,
   },
+  sosProgressBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(139, 0, 0, 0.8)',
+    borderRadius: 10,
+  },
   actionButtonText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
+    zIndex: 1,
   },
   startCard: {
     alignItems: 'center',
