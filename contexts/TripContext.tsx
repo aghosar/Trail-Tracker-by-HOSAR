@@ -56,33 +56,54 @@ export function TripProvider({ children }: { children: ReactNode }) {
       timerIntervalRef.current = null;
     }
     
-    if (activeTrip) {
+    if (activeTrip && activeTrip.startTime) {
       console.log('[TripContext] Starting persistent timer for trip:', activeTrip.id);
-      const startTime = new Date(activeTrip.startTime).getTime();
       
-      const updateTimer = () => {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        setElapsedTime(elapsed);
-      };
-      
-      // Update immediately
-      updateTimer();
-      
-      // Update every second
-      timerIntervalRef.current = setInterval(updateTimer, 1000);
-      
-      return () => {
-        console.log('[TripContext] Cleaning up timer interval');
-        if (timerIntervalRef.current) {
-          clearInterval(timerIntervalRef.current);
-          timerIntervalRef.current = null;
+      try {
+        const startTime = new Date(activeTrip.startTime).getTime();
+        
+        // Validate startTime
+        if (isNaN(startTime)) {
+          console.error('[TripContext] Invalid startTime:', activeTrip.startTime);
+          setElapsedTime(0);
+          return;
         }
-      };
+        
+        const updateTimer = () => {
+          const now = Date.now();
+          const elapsed = Math.floor((now - startTime) / 1000);
+          
+          // Ensure elapsed time is non-negative
+          if (elapsed >= 0) {
+            setElapsedTime(elapsed);
+          } else {
+            console.error('[TripContext] Negative elapsed time calculated');
+            setElapsedTime(0);
+          }
+        };
+        
+        // Update immediately
+        updateTimer();
+        
+        // Update every second
+        timerIntervalRef.current = setInterval(updateTimer, 1000);
+        
+        return () => {
+          console.log('[TripContext] Cleaning up timer interval');
+          if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+          }
+        };
+      } catch (error) {
+        console.error('[TripContext] Error setting up timer:', error);
+        setElapsedTime(0);
+      }
     } else {
       console.log('[TripContext] No active trip, timer not started');
       setElapsedTime(0);
     }
-  }, [activeTrip?.startTime]);
+  }, [activeTrip]);
 
   return (
     <TripContext.Provider

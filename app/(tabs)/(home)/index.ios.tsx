@@ -67,10 +67,10 @@ export default function HomeScreen() {
   const sosIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const sosTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const showFeedback = (title: string, message: string, type: 'error' | 'success' | 'info' = 'info') => {
+  const showFeedback = useCallback((title: string, message: string, type: 'error' | 'success' | 'info' = 'info') => {
     console.log('[HomeScreen] Showing feedback:', { title, message, type });
     setFeedbackModal({ visible: true, title, message, type });
-  };
+  }, []);
 
   const requestLocationPermission = useCallback(async () => {
     try {
@@ -93,7 +93,7 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('[HomeScreen] Error requesting location permission:', error);
     }
-  }, []);
+  }, [showFeedback]);
 
   useEffect(() => {
     console.log('[HomeScreen] Initializing home screen');
