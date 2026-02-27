@@ -86,6 +86,7 @@ export default function HomeScreen() {
   const [sosHolding, setSosHolding] = useState(false);
   const sosIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const sosTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const showFeedback = (title: string, message: string, type: 'error' | 'success' | 'info' = 'info') => {
     console.log('[HomeScreen] Showing feedback:', { title, message, type });
@@ -102,14 +103,36 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
+    console.log('[HomeScreen] Timer effect triggered. Active trip:', !!activeTrip);
+    
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    
     if (activeTrip) {
+      console.log('[HomeScreen] Starting timer for trip:', activeTrip.id);
       const startTime = new Date(activeTrip.startTime).getTime();
-      const timer = setInterval(() => {
+      
+      const updateTimer = () => {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
         setElapsedTime(elapsed);
-      }, 1000);
+      };
       
-      return () => clearInterval(timer);
+      updateTimer();
+      
+      timerIntervalRef.current = setInterval(updateTimer, 1000);
+      
+      return () => {
+        console.log('[HomeScreen] Cleaning up timer interval');
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
+        }
+      };
+    } else {
+      console.log('[HomeScreen] No active trip, timer not started');
+      setElapsedTime(0);
     }
   }, [activeTrip]);
 
