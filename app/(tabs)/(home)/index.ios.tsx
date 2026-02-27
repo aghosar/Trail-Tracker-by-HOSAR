@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,33 +19,13 @@ import * as SMS from 'expo-sms';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import { Stack } from 'expo-router';
+import { useTripContext } from '@/contexts/TripContext';
 
 // Helper to resolve image sources (handles both local require() and remote URLs)
 function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
   if (!source) return { uri: '' };
   if (typeof source === 'string') return { uri: source };
   return source as ImageSourcePropType;
-}
-
-interface EmergencyContact {
-  id: string;
-  name: string;
-  phoneNumber: string;
-}
-
-interface ActiveTrip {
-  id: string;
-  activityType: string;
-  startTime: string;
-  status: string;
-  lastLatitude: number;
-  lastLongitude: number;
-  emergencyContact: {
-    name: string;
-    phoneNumber: string;
-  };
-  clothingDescription: string;
-  vehicleDescription: string;
 }
 
 interface FeedbackModal {
@@ -56,10 +36,10 @@ interface FeedbackModal {
 }
 
 export default function HomeScreen() {
+  const { activeTrip, elapsedTime, setActiveTrip, emergencyContacts, setEmergencyContacts } = useTripContext();
+  
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
-  const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showSOSModal, setShowSOSModal] = useState(false);
@@ -74,7 +54,6 @@ export default function HomeScreen() {
     type: 'info',
   });
   
-  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
   const [selectedContactId, setSelectedContactId] = useState('');
   const [activityType, setActivityType] = useState('hiking');
   const [clothingDescription, setClothingDescription] = useState('');
@@ -87,57 +66,13 @@ export default function HomeScreen() {
   const [sosHolding, setSosHolding] = useState(false);
   const sosIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const sosTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const showFeedback = (title: string, message: string, type: 'error' | 'success' | 'info' = 'info') => {
     console.log('[HomeScreen] Showing feedback:', { title, message, type });
     setFeedbackModal({ visible: true, title, message, type });
   };
 
-  useEffect(() => {
-    console.log('[HomeScreen] Initializing app without authentication');
-    const init = async () => {
-      await requestLocationPermission();
-      setInitialLoading(false);
-    };
-    init();
-  }, []);
-
-  useEffect(() => {
-    console.log('[HomeScreen] Timer effect triggered. Active trip:', !!activeTrip);
-    
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-    
-    if (activeTrip) {
-      console.log('[HomeScreen] Starting timer for trip:', activeTrip.id);
-      const startTime = new Date(activeTrip.startTime).getTime();
-      
-      const updateTimer = () => {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        setElapsedTime(elapsed);
-      };
-      
-      updateTimer();
-      
-      timerIntervalRef.current = setInterval(updateTimer, 1000);
-      
-      return () => {
-        console.log('[HomeScreen] Cleaning up timer interval');
-        if (timerIntervalRef.current) {
-          clearInterval(timerIntervalRef.current);
-          timerIntervalRef.current = null;
-        }
-      };
-    } else {
-      console.log('[HomeScreen] No active trip, timer not started');
-      setElapsedTime(0);
-    }
-  }, [activeTrip]);
-
-  const requestLocationPermission = async () => {
+  const requestLocationPermission = useCallback(async () => {
     try {
       console.log('[HomeScreen] Requesting foreground location permission');
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -158,7 +93,16 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('[HomeScreen] Error requesting location permission:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    console.log('[HomeScreen] Initializing home screen');
+    const init = async () => {
+      await requestLocationPermission();
+      setInitialLoading(false);
+    };
+    init();
+  }, [requestLocationPermission]);
 
   const validatePhoneNumber = (phone: string): boolean => {
     const trimmedPhone = phone.trim();
@@ -227,18 +171,18 @@ export default function HomeScreen() {
       return;
     }
     
-    console.log('[HomeScreen] Adding emergency contact locally', { 
+    console.log('[HomeScreen] Adding emergency contact', { 
       name: trimmedName, 
       phone: trimmedPhone 
     });
     
-    const newContact: EmergencyContact = {
+    const newContact = {
       id: Date.now().toString(),
       name: trimmedName,
       phoneNumber: trimmedPhone,
     };
     
-    setEmergencyContacts(prev => [...prev, newContact]);
+    setEmergencyContacts([...emergencyContacts, newContact]);
     setNewContactName('');
     setNewContactPhone('');
     setShowContactModal(false);
@@ -290,7 +234,7 @@ export default function HomeScreen() {
         throw new Error('Selected contact not found');
       }
 
-      const newTrip: ActiveTrip = {
+      const newTrip = {
         id: Date.now().toString(),
         activityType,
         startTime: new Date().toISOString(),
@@ -355,7 +299,7 @@ export default function HomeScreen() {
       const { latitude, longitude } = location.coords;
       console.log('[HomeScreen] Got location for check-in', { latitude, longitude });
       
-      const updatedTrip: ActiveTrip = {
+      const updatedTrip = {
         ...activeTrip,
         lastLatitude: latitude,
         lastLongitude: longitude,
@@ -403,7 +347,6 @@ export default function HomeScreen() {
       
       console.log('[HomeScreen] Trip completed successfully');
       setActiveTrip(null);
-      setElapsedTime(0);
       showFeedback('Trip Complete', 'Your trip has been completed and your emergency contact has been notified.', 'success');
     } catch (error: any) {
       console.error('[HomeScreen] Error completing trip:', error);
@@ -424,7 +367,7 @@ export default function HomeScreen() {
     try {
       const { latitude, longitude } = currentLocation.coords;
       
-      const updatedTrip: ActiveTrip = {
+      const updatedTrip = {
         ...activeTrip,
         status: 'sos',
         lastLatitude: latitude,
@@ -628,7 +571,7 @@ export default function HomeScreen() {
                 <Text style={styles.timerText}>{formatTime(elapsedTime)}</Text>
               </View>
 
-              <Text style={styles.activityType}>{activityType.charAt(0).toUpperCase() + activityType.slice(1)}</Text>
+              <Text style={styles.activityType}>{activeTrip.activityType.charAt(0).toUpperCase() + activeTrip.activityType.slice(1)}</Text>
               <Text style={styles.contactName}>{activeTrip.emergencyContact.name}</Text>
 
               <View style={styles.buttonRow}>
