@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Trail Tracker by HOSAR",
-    "slug": "trail-tracker-by-hosar",
+    "slug": "Trail Tracker by HOSAR",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-ohb.png",
@@ -53,7 +53,7 @@
         }
       ]
     ],
-    "scheme": "trail-tracker",
+    "scheme": "Trail Tracker by HOSAR",
     "experiments": {
       "typedRoutes": true
     },
