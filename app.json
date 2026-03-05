@@ -1,3 +1,4 @@
+
 {
   "expo": {
     "name": "Trail Tracker by HOSAR",
@@ -64,11 +65,19 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {},
+      "router": {
+        "origin": false
+      },
       "backendUrl": "https://eqbaw5bgu9vh4u3gq5ccd3ns2j8z6zja.app.specular.dev",
       "eas": {
         "projectId": "your-eas-project-id"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/your-eas-project-id"
     }
   }
 }
