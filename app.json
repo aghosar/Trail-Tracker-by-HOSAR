@@ -1,3 +1,4 @@
+
 {
   "expo": {
     "name": "Trail Tracker by HOSAR",
@@ -14,11 +15,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.TrailTracker",
+      "bundleIdentifier": "com.hosar.trailtracker",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "We need your location to track your outdoor activities and send your position to emergency contacts.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to track your outdoor activities and send periodic updates to your emergency contacts.",
+        "NSLocationWhenInUseUsageDescription": "Trail Tracker needs your location to track your outdoor activities and send your position to emergency contacts for safety.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Trail Tracker needs continuous location access to track your outdoor activities and send periodic updates to your emergency contacts for safety.",
+        "NSLocationAlwaysUsageDescription": "Trail Tracker needs continuous location access to track your outdoor activities and send periodic updates to your emergency contacts for safety.",
         "UIBackgroundModes": [
           "location"
         ]
@@ -30,12 +33,14 @@
         "backgroundColor": "#10B981"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.TrailTracker",
+      "package": "com.hosar.trailtracker",
+      "versionCode": 1,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "FOREGROUND_SERVICE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
       ]
     },
     "web": {
@@ -49,17 +54,22 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Trail Tracker to use your location to track your outdoor activities and send updates to emergency contacts."
+          "locationAlwaysAndWhenInUsePermission": "Trail Tracker needs your location to track your outdoor activities and send updates to emergency contacts for safety.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
         }
       ]
     ],
-    "scheme": "trailtrackerbyhosar",
+    "scheme": "trailtracker",
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "router": {},
-      "backendUrl": "https://eqbaw5bgu9vh4u3gq5ccd3ns2j8z6zja.app.specular.dev"
+      "backendUrl": "https://eqbaw5bgu9vh4u3gq5ccd3ns2j8z6zja.app.specular.dev",
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
     }
   }
 }
