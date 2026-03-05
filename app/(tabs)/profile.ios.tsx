@@ -69,7 +69,7 @@ export default function ProfileScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Support HOSAR</Text>
             <Text style={styles.description}>
-              This app supports the High Desert Off-Road Search and Rescue (HOSAR) organization.
+              This app supports the Heber Overgaard Search and Rescue (HOSAR) organization.
             </Text>
             
             <TouchableOpacity
