@@ -1,4 +1,3 @@
-
 {
   "expo": {
     "name": "Trail Tracker by HOSAR",
@@ -60,7 +59,7 @@
         }
       ]
     ],
-    "scheme": "trailtracker",
+    "scheme": "trailtrackerbyhosar",
     "experiments": {
       "typedRoutes": true
     },
@@ -68,7 +67,7 @@
       "router": {
         "origin": false
       },
-      "backendUrl": "https://eqbaw5bgu9vh4u3gq5ccd3ns2j8z6zja.app.specular.dev",
+      "backendUrl": "https://7fjexdwwvrnctf47w8v8h8fhfgm4pg7z.app.specular.dev",
       "eas": {
         "projectId": "your-eas-project-id"
       }
