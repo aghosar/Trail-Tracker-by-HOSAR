@@ -1,43 +1,27 @@
-import * as React from "react";
-import { createContext, useCallback, useContext } from "react";
-import { ExtensionStorage } from "@bacons/apple-targets";
 
-// Initialize storage with your group ID
-const storage = new ExtensionStorage(
-  "group.com.<user_name>.<app_name>"
-);
+import { createContext, useContext, useState, ReactNode } from "react";
 
-type WidgetContextType = {
-  refreshWidget: () => void;
-};
+interface WidgetContextType {
+  isEditMode: boolean;
+  setIsEditMode: (value: boolean) => void;
+}
 
-const WidgetContext = createContext<WidgetContextType | null>(null);
+const WidgetContext = createContext<WidgetContextType | undefined>(undefined);
 
-export function WidgetProvider({ children }: { children: React.ReactNode }) {
-  // Update widget state whenever what we want to show changes
-  React.useEffect(() => {
-    // set widget_state to null if we want to reset the widget
-    // storage.set("widget_state", null);
+export function useWidgetContext() {
+  const context = useContext(WidgetContext);
+  if (!context) {
+    throw new Error("useWidgetContext must be used within WidgetProvider");
+  }
+  return context;
+}
 
-    // Refresh widget
-    ExtensionStorage.reloadWidget();
-  }, []);
-
-  const refreshWidget = useCallback(() => {
-    ExtensionStorage.reloadWidget();
-  }, []);
+export function WidgetProvider({ children }: { children: ReactNode }) {
+  const [isEditMode, setIsEditMode] = useState(false);
 
   return (
-    <WidgetContext.Provider value={{ refreshWidget }}>
+    <WidgetContext.Provider value={{ isEditMode, setIsEditMode }}>
       {children}
     </WidgetContext.Provider>
   );
 }
-
-export const useWidget = () => {
-  const context = useContext(WidgetContext);
-  if (!context) {
-    throw new Error("useWidget must be used within a WidgetProvider");
-  }
-  return context;
-};

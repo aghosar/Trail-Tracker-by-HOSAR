@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 
 interface EmergencyContact {
   id: string;
@@ -44,7 +44,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Timer effect that persists across navigation
   useEffect(() => {
@@ -56,14 +56,14 @@ export function TripProvider({ children }: { children: ReactNode }) {
       timerIntervalRef.current = null;
     }
     
-    if (activeTrip && activeTrip.startTime) {
+    if (activeTrip?.startTime) {
       console.log('[TripContext] Starting persistent timer for trip:', activeTrip.id);
       
       try {
         const startTime = new Date(activeTrip.startTime).getTime();
         
         // Validate startTime
-        if (isNaN(startTime)) {
+        if (Number.isNaN(startTime)) {
           console.error('[TripContext] Invalid startTime:', activeTrip.startTime);
           setElapsedTime(0);
           return;

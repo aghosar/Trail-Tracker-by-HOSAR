@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Platform } from "react-native";
 import { authClient, setBearerToken, clearAuthTokens } from "@/lib/auth";
 import * as Linking from "expo-linking";
@@ -26,31 +26,50 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function openOAuthPopup(provider: string) {
-  const redirectUri = Linking.createURL("/auth-callback");
-  const popupUrl = Linking.createURL("/auth-popup", {
-    queryParams: { provider, redirectUri },
-  });
-  
   if (Platform.OS === "web") {
     const width = 500;
     const height = 600;
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
     
-    window.open(
-      popupUrl,
+    const popup = window.open(
+      `/auth-popup?provider=${provider}`,
       "OAuth",
       `width=${width},height=${height},left=${left},top=${top}`
     );
-  } else {
-    Linking.openURL(popupUrl);
+    
+    return new Promise<void>((resolve, reject) => {
+      const checkClosed = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener("message", handleMessage);
+          reject(new Error("OAuth popup was closed"));
+        }
+      }, 1000);
+      
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === "oauth-success") {
+          clearInterval(checkClosed);
+          window.removeEventListener("message", handleMessage);
+          popup?.close();
+          resolve();
+        } else if (event.data?.type === "oauth-error") {
+          clearInterval(checkClosed);
+          window.removeEventListener("message", handleMessage);
+          popup?.close();
+          reject(new Error(event.data.error || "OAuth failed"));
+        }
+      };
+      
+      window.addEventListener("message", handleMessage);
+    });
   }
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+  if (!context) {
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
 }
@@ -66,67 +85,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUser = async () => {
     try {
-      console.log("[AuthContext] Fetching session from Better Auth...");
+      console.log("[AuthContext] Fetching user session");
       const session = await authClient.getSession();
-      console.log("[AuthContext] Session response:", session);
       
-      if (session && session.data && session.data.user) {
-        setUser(session.data.user as User);
+      if (session?.user) {
+        console.log("[AuthContext] User session found:", session.user.email);
+        setUser(session.user as User);
       } else {
-        console.log("[AuthContext] No active session, clearing tokens");
+        console.log("[AuthContext] No active session");
         setUser(null);
-        await clearAuthTokens();
       }
     } catch (error) {
-      console.error("[AuthContext] Error fetching user session:", error);
+      console.error("[AuthContext] Error fetching user:", error);
       setUser(null);
-      await clearAuthTokens();
     } finally {
       setLoading(false);
     }
   };
 
   const signInWithEmail = async (email: string, password: string) => {
-    try {
-      const response = await authClient.signIn.email({
-        email,
-        password,
-      });
-      
-      if (response.data) {
-        await setBearerToken(response.data.token);
-        await fetchUser();
-      } else {
-        throw new Error("Sign in failed");
-      }
-    } catch (error) {
-      console.error("[AuthContext] Sign in error:", error);
-      throw error;
+    console.log("[AuthContext] Signing in with email:", email);
+    const result = await authClient.signIn.email({ email, password });
+    
+    if (result.error) {
+      console.error("[AuthContext] Sign in error:", result.error);
+      throw new Error(result.error.message || "Sign in failed");
     }
+    
+    if (result.data?.session?.token) {
+      await setBearerToken(result.data.session.token);
+    }
+    
+    await fetchUser();
   };
 
   const signUpWithEmail = async (email: string, password: string, name?: string) => {
-    try {
-      const response = await authClient.signUp.email({
-        email,
-        password,
-        name,
-      });
-      
-      if (response.data) {
-        await setBearerToken(response.data.token);
-        await fetchUser();
-      } else {
-        throw new Error("Sign up failed");
-      }
-    } catch (error) {
-      console.error("[AuthContext] Sign up error:", error);
-      throw error;
+    console.log("[AuthContext] Signing up with email:", email);
+    const result = await authClient.signUp.email({ email, password, name });
+    
+    if (result.error) {
+      console.error("[AuthContext] Sign up error:", result.error);
+      throw new Error(result.error.message || "Sign up failed");
     }
+    
+    if (result.data?.session?.token) {
+      await setBearerToken(result.data.session.token);
+    }
+    
+    await fetchUser();
   };
 
   const signInWithSocial = async (provider: "google" | "apple" | "github") => {
-    openOAuthPopup(provider);
+    console.log(`[AuthContext] Signing in with ${provider}`);
+    
+    if (Platform.OS === "web") {
+      await openOAuthPopup(provider);
+      await fetchUser();
+    } else {
+      const redirectUri = Linking.createURL("/auth-callback");
+      console.log("[AuthContext] OAuth redirect URI:", redirectUri);
+      
+      const result = await authClient.signIn.social({
+        provider,
+        callbackURL: redirectUri,
+      });
+      
+      if (result.error) {
+        console.error(`[AuthContext] ${provider} sign in error:`, result.error);
+        throw new Error(result.error.message || `${provider} sign in failed`);
+      }
+      
+      if (result.data?.url) {
+        console.log("[AuthContext] Opening OAuth URL:", result.data.url);
+        await Linking.openURL(result.data.url);
+      }
+    }
   };
 
   const signInWithGoogle = async () => {
@@ -143,14 +176,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      console.log("[AuthContext] Signing out");
       await authClient.signOut();
-      setUser(null);
-      await clearAuthTokens();
     } catch (error) {
-      console.error("[AuthContext] Sign out error:", error);
-      // Always clear local state even if API call fails
-      setUser(null);
+      console.error("[AuthContext] Error signing out:", error);
+    } finally {
       await clearAuthTokens();
+      setUser(null);
     }
   };
 

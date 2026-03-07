@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -67,8 +67,9 @@ export default function AuthScreen() {
         await signUpWithEmail(email, password, name);
         router.replace("/");
       }
-    } catch (error: any) {
-      showError("Authentication Failed", error.message || "Please check your credentials and try again.");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Please check your credentials and try again.";
+      showError("Authentication Failed", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -83,8 +84,9 @@ export default function AuthScreen() {
         await signInWithApple();
       }
       router.replace("/");
-    } catch (error: any) {
-      showError("Sign In Failed", error.message || "Social authentication failed. Please try again.");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Social authentication failed. Please try again.";
+      showError("Sign In Failed", errorMessage);
     } finally {
       setLoading(false);
     }
