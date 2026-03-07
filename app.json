@@ -1,4 +1,3 @@
-
 {
   "expo": {
     "name": "Trail Tracker by HOSAR",
@@ -68,7 +67,7 @@
       "router": {
         "origin": false
       },
-      "backendUrl": "https://mcm37uwzyyqcuwapgk8gd7k4yjpaxkhe.app.specular.dev"
+      "backendUrl": "https://6hg355e9jcyw5e84dskxzf7medbbg5e8.app.specular.dev"
     }
   }
 }
