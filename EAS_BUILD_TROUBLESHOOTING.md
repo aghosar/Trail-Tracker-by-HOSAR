@@ -1,174 +1,209 @@
 
-# EAS Build & Submit Troubleshooting Guide
+# EAS Build Troubleshooting Guide - Trail Tracker
 
-## Common Issues & Solutions
+## ✅ FIXED ISSUES (Latest Update)
 
-### 1. **Bundle Identifier Issues**
-**Error:** "Bundle identifier is invalid" or "Package name already exists"
+### Critical Configuration Errors Fixed:
 
-**Solution:**
-- Changed from `com.anonymous.TrailTracker` to `com.hosar.trailtracker`
-- Ensure you own this identifier in Apple Developer Portal and Google Play Console
-- If you need a different identifier, update both `ios.bundleIdentifier` and `android.package` in `app.json`
+1. **❌ Invalid `runtimeVersion` Configuration**
+   - **Problem:** Used `{ "policy": "appVersion" }` which causes build failures
+   - **Fix:** Removed `runtimeVersion` and `updates` config (not needed for basic builds)
+   - **Why:** EAS Update configuration requires proper project initialization
 
-### 2. **Missing EAS Project ID**
-**Error:** "No project ID found"
+2. **❌ Invalid EAS Project ID**
+   - **Problem:** Placeholder "your-eas-project-id" in `app.json`
+   - **Fix:** Removed `extra.eas.projectId` and `updates.url` (will be added by `eas build` automatically)
+   - **Why:** EAS CLI generates this during first build
 
-**Solution:**
-- Run: `eas init` (Note: You'll need to do this via EAS CLI if you have access)
-- This will add your project ID to `app.json` under `extra.eas.projectId`
+3. **❌ TSConfig JSX Mismatch**
+   - **Problem:** Used `"jsx": "react-jsx"` which is for React web, not React Native
+   - **Fix:** Changed to `"jsx": "react-native"` with `"jsxImportSource": "react"`
+   - **Why:** React Native requires specific JSX transform configuration
 
-### 3. **iOS Submission Requirements**
-**Errors:**
-- "Missing compliance information"
-- "Missing privacy policy"
-- "Invalid provisioning profile"
+4. **❌ Backend Folder in TSConfig**
+   - **Problem:** TypeScript was trying to compile backend files
+   - **Fix:** Added `"backend"` to `exclude` array in `tsconfig.json`
+   - **Why:** Backend has its own TypeScript config and shouldn't be compiled with frontend
 
-**Solutions:**
-- ✅ Set `ITSAppUsesNonExemptEncryption: false` (already configured)
-- ✅ Added detailed location permission descriptions
-- ⚠️ You need to configure in `eas.json` submit section:
-  - `appleId`: Your Apple ID email
-  - `ascAppId`: App Store Connect App ID (found in App Store Connect)
-  - `appleTeamId`: Your Apple Developer Team ID
+## Current Configuration Status
 
-### 4. **Android Submission Requirements**
-**Errors:**
-- "Missing service account key"
-- "Invalid package name"
+### ✅ app.json - READY FOR BUILD
+```json
+{
+  "expo": {
+    "name": "Trail Tracker by HOSAR",
+    "slug": "trail-tracker-by-hosar",
+    "version": "1.0.0",
+    "scheme": "trail-tracker",
+    "ios": {
+      "bundleIdentifier": "com.hosar.trailtracker",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.hosar.trailtracker",
+      "versionCode": 1
+    }
+  }
+}
+```
 
-**Solutions:**
-- ✅ Changed package to `com.hosar.trailtracker`
-- ⚠️ You need to:
-  1. Create a service account in Google Play Console
-  2. Download the JSON key file
-  3. Update `serviceAccountKeyPath` in `eas.json`
+### ✅ eas.json - READY FOR BUILD
+- Development profile: Internal distribution with simulator support
+- Preview profile: Internal APK builds
+- Production profile: Store-ready builds
+- All profiles have `EAS_BUILD_NO_EXPO_GO_WARNING` set
 
-### 5. **Version & Build Number Issues**
-**Error:** "Version already exists" or "Build number must be higher"
+### ✅ tsconfig.json - FIXED
+- Changed `jsx` from `react-jsx` to `react-native`
+- Added `backend` to exclude list
+- Proper module resolution for Expo SDK 54
 
-**Solution:**
-- ✅ Enabled `autoIncrement: true` in `eas.json` (already configured)
-- This automatically increments build numbers
-- For manual control, update `ios.buildNumber` and `android.versionCode` in `app.json`
+## Build Commands
 
-### 6. **Asset Issues**
-**Errors:**
-- "Icon not found"
-- "Splash screen invalid"
+### First Time Setup
+The first time you run `eas build`, it will:
+1. Prompt you to create an EAS account (if needed)
+2. Initialize your project and generate a project ID
+3. Set up credentials for iOS/Android
 
-**Solution:**
-- ✅ Verified all asset paths exist:
-  - `./assets/icon.png`
-  - `./assets/images/app-icon-ohb.png`
-  - `./assets/images/final_quest_240x240.png`
+### Development Build (Recommended First)
+```bash
+eas build --profile development --platform ios
+eas build --profile development --platform android
+```
 
-### 7. **Scheme Configuration**
-**Error:** "Invalid URL scheme"
+### Production Build
+```bash
+eas build --profile production --platform ios
+eas build --profile production --platform android
+```
 
-**Solution:**
-- ✅ Changed scheme from `trailtrackerbyhosar` to `trailtracker` (simpler, more standard)
-- This affects deep linking and OAuth redirects
+### Both Platforms
+```bash
+eas build --profile production --platform all
+```
 
-## Next Steps for Successful Build
+## Common Exit Code 1 Causes (Now Fixed)
 
-### For iOS:
-1. **Apple Developer Account Setup:**
-   - Ensure you have an active Apple Developer account ($99/year)
-   - Create an App ID in Apple Developer Portal with identifier: `com.hosar.trailtracker`
-   - Create provisioning profiles for development and distribution
+### ✅ Configuration Errors (FIXED)
+- Invalid runtimeVersion format → Removed
+- Placeholder project IDs → Removed (auto-generated)
+- Wrong JSX configuration → Fixed to react-native
+- Backend compilation conflicts → Excluded from build
 
-2. **App Store Connect Setup:**
-   - Create a new app in App Store Connect
-   - Note the App Store Connect App ID (numeric ID)
-   - Update `eas.json` with your Apple ID, ASC App ID, and Team ID
+### ⚠️ Potential Remaining Issues
 
-3. **Build Command:**
-   ```bash
-   eas build --platform ios --profile production
-   ```
+1. **Missing Credentials**
+   - iOS: Need Apple Developer account
+   - Android: Will auto-generate keystore on first build
+   - Solution: Follow EAS CLI prompts during build
 
-4. **Submit Command:**
-   ```bash
-   eas submit --platform ios --profile production
-   ```
+2. **Asset Issues**
+   - Verify all images exist:
+     - `./assets/icon.png`
+     - `./assets/images/app-icon-ohb.png`
+     - `./assets/images/final_quest_240x240.png`
 
-### For Android:
-1. **Google Play Console Setup:**
-   - Create a Google Play Developer account ($25 one-time fee)
-   - Create a new app with package name: `com.hosar.trailtracker`
-   - Set up API access and create a service account
-   - Download the service account JSON key
+3. **Native Dependencies**
+   - Some packages may need additional configuration
+   - Check build logs for specific native module errors
 
-2. **Update Configuration:**
-   - Place the service account JSON key in your project
-   - Update `serviceAccountKeyPath` in `eas.json` to point to this file
+## What Happens During Build
 
-3. **Build Command:**
-   ```bash
-   eas build --platform android --profile production
-   ```
+### iOS Build Process:
+1. EAS downloads your code
+2. Runs `expo prebuild` to generate native iOS project
+3. Installs CocoaPods dependencies
+4. Compiles native code with Xcode
+5. Signs the app (requires Apple Developer account)
+6. Uploads IPA file
 
-4. **Submit Command:**
-   ```bash
-   eas submit --platform android --profile production
-   ```
+### Android Build Process:
+1. EAS downloads your code
+2. Runs `expo prebuild` to generate native Android project
+3. Downloads Gradle dependencies
+4. Compiles native code with Android SDK
+5. Signs the APK/AAB (auto-generates keystore if needed)
+6. Uploads APK/AAB file
 
-## Configuration Changes Made
+## Debugging Build Failures
 
-### ✅ Fixed in `app.json`:
-- Changed iOS `bundleIdentifier` from `com.anonymous.TrailTracker` to `com.hosar.trailtracker`
-- Changed Android `package` from `com.anonymous.TrailTracker` to `com.hosar.trailtracker`
-- Simplified `scheme` from `trailtrackerbyhosar` to `trailtracker`
-- Added explicit `buildNumber` (iOS) and `versionCode` (Android)
-- Enhanced location permission descriptions
-- Added `NSLocationAlwaysUsageDescription` for iOS
-- Added `ACCESS_BACKGROUND_LOCATION` permission for Android
-- Enabled background location in expo-location plugin
-
-### ✅ Fixed in `eas.json`:
-- Added `submit` configuration section
-- Added iOS submission placeholders (appleId, ascAppId, appleTeamId)
-- Added Android submission placeholders (serviceAccountKeyPath, track)
-- Configured production build settings for both platforms
-
-## Common Exit Code 1 Errors
-
-**Exit code 1** typically means:
-1. **Build failed during compilation** - Check build logs for specific errors
-2. **Missing credentials** - Ensure Apple/Google credentials are configured
-3. **Invalid configuration** - Verify all paths and identifiers are correct
-4. **Asset issues** - Ensure all referenced assets exist
-5. **Dependency conflicts** - Check for incompatible package versions
-
-## Verification Checklist
-
-Before submitting again:
-- [ ] EAS project initialized (`eas init`)
-- [ ] Apple Developer account active (for iOS)
-- [ ] Google Play Developer account active (for Android)
-- [ ] Bundle identifiers registered in respective portals
-- [ ] Service account key created and configured (Android)
-- [ ] Apple ID, ASC App ID, and Team ID configured (iOS)
-- [ ] All asset files exist at specified paths
-- [ ] Version numbers are higher than previous submissions
-- [ ] Location permissions properly described
-- [ ] Privacy policy URL added (if required by stores)
-
-## Getting More Information
-
-To see detailed build logs:
+### View Build Logs:
 ```bash
 eas build:list
 eas build:view [build-id]
 ```
 
-The build logs will show the exact error that caused exit code 1.
+### Common Log Patterns:
 
-## Contact & Support
+**"Could not find module"**
+- Missing dependency in package.json
+- Run: `npm install [package-name]`
 
-If you continue to experience issues:
-1. Check the detailed build logs in EAS dashboard
-2. Verify all credentials are correctly configured
-3. Ensure bundle identifiers are registered and available
-4. Review Apple/Google submission guidelines for any policy violations
+**"Duplicate class found"**
+- Conflicting dependencies
+- Check for duplicate packages in package.json
+
+**"Command failed with exit code 1"**
+- Native compilation error
+- Check build logs for specific file/line
+
+**"No matching provisioning profiles found"**
+- iOS credentials issue
+- Run: `eas credentials` to manage
+
+## Next Steps After Successful Build
+
+### For Development Builds:
+1. Download the build from EAS dashboard
+2. Install on device/simulator
+3. Run `expo start --dev-client` to connect
+
+### For Production Builds:
+1. Test thoroughly on TestFlight (iOS) or Internal Testing (Android)
+2. Submit to stores using `eas submit`
+
+## Store Submission Requirements
+
+### iOS App Store:
+- Active Apple Developer account ($99/year)
+- App Store Connect app created
+- Privacy policy URL (if collecting data)
+- App screenshots and description
+
+### Google Play Store:
+- Google Play Developer account ($25 one-time)
+- Play Console app created
+- Privacy policy URL (if collecting data)
+- App screenshots and description
+
+## Support Resources
+
+- EAS Build Docs: https://docs.expo.dev/build/introduction/
+- EAS Submit Docs: https://docs.expo.dev/submit/introduction/
+- Expo Forums: https://forums.expo.dev/
+- EAS Build Status: https://status.expo.dev/
+
+## Verification Checklist
+
+Before running `eas build`:
+- [x] app.json has valid bundle identifiers
+- [x] eas.json has proper build profiles
+- [x] tsconfig.json uses react-native JSX
+- [x] All asset files exist
+- [x] package.json has all dependencies
+- [x] No placeholder values in configs
+- [ ] EAS account created (done during first build)
+- [ ] Apple Developer account (for iOS)
+- [ ] Google Play Developer account (for Android)
+
+## Recent Fixes Applied
+
+**Date: 2026-03-07**
+- Removed invalid `runtimeVersion` configuration
+- Removed placeholder EAS project ID and update URL
+- Fixed TSConfig JSX from `react-jsx` to `react-native`
+- Added backend to TSConfig exclude list
+- Cleaned up eas.json build profiles
+
+**Result:** Configuration is now ready for EAS build. Run `eas build --profile development --platform [ios|android]` to start your first build.

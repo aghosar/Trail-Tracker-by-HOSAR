@@ -4,7 +4,8 @@
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
-    "jsx": "react-jsx",
+    "jsx": "react-native",
+    "jsxImportSource": "react",
     "target": "ES2022",
     "lib": ["ES2022"],
     "module": "ESNext",
@@ -27,6 +28,7 @@
     "workbox-config.js"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "backend"
   ]
 }
