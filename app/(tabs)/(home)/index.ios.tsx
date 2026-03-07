@@ -75,23 +75,98 @@ export default function HomeScreen() {
   const requestLocationPermission = useCallback(async () => {
     try {
       console.log('[HomeScreen] Requesting foreground location permission');
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      const granted = status === 'granted';
-      setHasLocationPermission(granted);
+      console.log('[HomeScreen] Platform:', Platform.OS);
       
-      if (granted) {
+      // Check current permission status first
+      const currentStatus = await Location.getForegroundPermissionsAsync();
+      console.log('[HomeScreen] Current permission status:', currentStatus);
+      
+      if (currentStatus.status === 'granted') {
+        console.log('[HomeScreen] Permission already granted');
+        setHasLocationPermission(true);
+        
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+          setCurrentLocation(location);
+          console.log('[HomeScreen] Current location obtained', location.coords);
+        } catch (locationError: any) {
+          console.error('[HomeScreen] Error getting current location:', locationError);
+          console.error('[HomeScreen] Location error details:', {
+            message: locationError.message,
+            code: locationError.code,
+            stack: locationError.stack,
+          });
+          showFeedback(
+            'Location Error',
+            `Unable to get your location: ${locationError.message || 'Unknown error'}`,
+            'error'
+          );
+        }
+        return;
+      }
+      
+      // Request permission
+      console.log('[HomeScreen] Requesting new permission');
+      const { status, canAskAgain, granted } = await Location.requestForegroundPermissionsAsync();
+      console.log('[HomeScreen] Permission request result:', { status, canAskAgain, granted });
+      
+      const isGranted = status === 'granted';
+      setHasLocationPermission(isGranted);
+      
+      if (isGranted) {
         console.log('[HomeScreen] Location permission granted, getting current position');
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-        setCurrentLocation(location);
-        console.log('[HomeScreen] Current location obtained', location.coords);
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+          setCurrentLocation(location);
+          console.log('[HomeScreen] Current location obtained', location.coords);
+        } catch (locationError: any) {
+          console.error('[HomeScreen] Error getting current location after permission grant:', locationError);
+          console.error('[HomeScreen] Location error details:', {
+            message: locationError.message,
+            code: locationError.code,
+            stack: locationError.stack,
+          });
+          showFeedback(
+            'Location Error',
+            `Permission granted but unable to get location: ${locationError.message || 'Unknown error'}`,
+            'error'
+          );
+        }
       } else {
         console.log('[HomeScreen] Location permission denied');
-        showFeedback('Permission Required', 'Location permission is required for safety tracking.', 'error');
+        console.log('[HomeScreen] Can ask again:', canAskAgain);
+        
+        let errorMessage = 'Location permission is required for safety tracking.';
+        
+        if (!canAskAgain) {
+          errorMessage = 'Location permission was denied. Please enable it in your device settings.';
+          if (Platform.OS === 'ios') {
+            errorMessage += ' Go to Settings > Privacy > Location Services.';
+          } else if (Platform.OS === 'android') {
+            errorMessage += ' Go to Settings > Apps > Trail Tracker > Permissions.';
+          }
+        }
+        
+        showFeedback('Permission Required', errorMessage, 'error');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[HomeScreen] Error requesting location permission:', error);
+      console.error('[HomeScreen] Error details:', {
+        message: error.message,
+        code: error.code,
+        name: error.name,
+        stack: error.stack,
+      });
+      
+      showFeedback(
+        'Permission Error',
+        `Failed to request location permission: ${error.message || 'Unknown error'}`,
+        'error'
+      );
     }
   }, [showFeedback]);
 
@@ -314,6 +389,11 @@ export default function HomeScreen() {
       showFeedback('Check In Sent', 'Your updated location has been sent to your emergency contact.', 'success');
     } catch (error: any) {
       console.error('[HomeScreen] Error updating trip location:', error);
+      console.error('[HomeScreen] Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack,
+      });
       
       let errorMessage = 'Failed to send location update';
       
