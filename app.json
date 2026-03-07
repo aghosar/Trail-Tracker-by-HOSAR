@@ -1,3 +1,4 @@
+
 {
   "expo": {
     "name": "Trail Tracker by HOSAR",
@@ -59,7 +60,7 @@
         }
       ]
     ],
-    "scheme": "trailtrackerbyhosar",
+    "scheme": "trail-tracker",
     "experiments": {
       "typedRoutes": true
     },
