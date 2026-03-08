@@ -1,23 +1,10 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 
-// Fix for default marker icon in leaflet
-const iconRetinaUrl = require('leaflet/dist/images/marker-icon-2x.png');
-const iconUrl = require('leaflet/dist/images/marker-icon.png');
-const shadowUrl = require('leaflet/dist/images/marker-shadow.png');
+import React from 'react';
+import { StyleSheet, View, ViewStyle, Text } from 'react-native';
 
-// Only run on client side (safe check)
-if (typeof window !== 'undefined') {
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-    L.Icon.Default.mergeOptions({
-        iconRetinaUrl: iconRetinaUrl,
-        iconUrl: iconUrl,
-        shadowUrl: shadowUrl,
-    });
-}
+// NOTE: react-leaflet and leaflet dependencies were removed from package.json
+// This is a placeholder implementation for web. To enable web maps, install:
+// npm install react-leaflet leaflet @types/leaflet
 
 export interface MapMarker {
     id: string;
@@ -50,38 +37,21 @@ export const Map = ({
     style,
     showsUserLocation = false
 }: MapProps) => {
-
-    const zoom = 13;
-
     return (
         <View style={[styles.container, style]}>
-            {/* MapContainer needs a fixed height/width context. React Native Web View provides flex layout, 
-          so direct child div with 100% should work */}
-            <div style={{ height: '100%', width: '100%', minHeight: 200 }}>
-                {typeof window !== 'undefined' && (
-                    <MapContainer
-                        center={[initialRegion.latitude, initialRegion.longitude]}
-                        zoom={zoom}
-                        scrollWheelZoom={false}
-                        style={{ height: '100%', width: '100%' }}
-                    >
-                        <TileLayer
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        />
-                        {markers.map((marker) => (
-                            <Marker
-                                key={marker.id}
-                                position={[marker.latitude, marker.longitude]}
-                            >
-                                <Popup>
-                                    {marker.title} <br /> {marker.description}
-                                </Popup>
-                            </Marker>
-                        ))}
-                    </MapContainer>
+            <View style={styles.placeholder}>
+                <Text style={styles.placeholderText}>
+                    Map view (Web)
+                </Text>
+                <Text style={styles.placeholderSubtext}>
+                    Location: {initialRegion.latitude.toFixed(4)}, {initialRegion.longitude.toFixed(4)}
+                </Text>
+                {markers.length > 0 && (
+                    <Text style={styles.placeholderSubtext}>
+                        {markers.length} marker{markers.length !== 1 ? 's' : ''}
+                    </Text>
                 )}
-            </div>
+            </View>
         </View>
     );
 };
@@ -93,5 +63,23 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         width: '100%',
         minHeight: 200,
+        backgroundColor: '#e8f4f8',
+    },
+    placeholder: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    placeholderText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 8,
+    },
+    placeholderSubtext: {
+        fontSize: 14,
+        color: '#666',
+        marginTop: 4,
     },
 });
