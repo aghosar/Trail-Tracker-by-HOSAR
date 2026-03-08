@@ -59,7 +59,7 @@
         }
       ]
     ],
-    "scheme": "trail-tracker",
+    "scheme": "trailtrackerbyhosar",
     "experiments": {
       "typedRoutes": true
     },

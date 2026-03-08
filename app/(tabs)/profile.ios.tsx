@@ -28,23 +28,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleAboutPress = async () => {
-    console.log('[ProfileScreen] Opening HOSAR about page');
-    const hosarUrl = 'https://hosar.org/';
-    
-    try {
-      const canOpen = await Linking.canOpenURL(hosarUrl);
-      if (canOpen) {
-        await Linking.openURL(hosarUrl);
-        console.log('[ProfileScreen] HOSAR about page opened successfully');
-      } else {
-        console.log('[ProfileScreen] Cannot open HOSAR URL');
-      }
-    } catch (error) {
-      console.error('[ProfileScreen] Error opening HOSAR about page:', error);
-    }
-  };
-
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -68,9 +51,6 @@ export default function ProfileScreen() {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Support HOSAR</Text>
-            <Text style={styles.description}>
-              This app supports the Heber Overgaard Search and Rescue (HOSAR) organization.
-            </Text>
             
             <TouchableOpacity
               style={styles.button}
@@ -78,14 +58,6 @@ export default function ProfileScreen() {
             >
               <IconSymbol ios_icon_name="heart.fill" android_material_icon_name="favorite" size={20} color="#FFFFFF" />
               <Text style={styles.buttonText}>Donate to HOSAR</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, styles.buttonSecondary]}
-              onPress={handleAboutPress}
-            >
-              <IconSymbol ios_icon_name="info.circle" android_material_icon_name="info" size={20} color={colors.primary} />
-              <Text style={[styles.buttonText, styles.buttonTextSecondary]}>Learn More</Text>
             </TouchableOpacity>
           </View>
 
