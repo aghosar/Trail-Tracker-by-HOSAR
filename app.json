@@ -4,11 +4,11 @@
     "slug": "trail-tracker-by-hosar",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/new logo.jpeg",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/app-icon-ohb.png",
+      "image": "./assets/images/new logo.jpeg",
       "resizeMode": "contain",
       "backgroundColor": "#10B981"
     },
@@ -28,7 +28,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/app-icon-ohb.png",
+        "foregroundImage": "./assets/images/new logo.jpeg",
         "backgroundColor": "#10B981"
       },
       "edgeToEdgeEnabled": true,
